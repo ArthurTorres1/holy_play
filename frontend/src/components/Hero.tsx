@@ -44,7 +44,7 @@ const Hero = () => {
   };
 
   return (
-    <section className="relative h-screen overflow-hidden">
+    <section id="inicio" className="relative h-screen overflow-hidden">
       {featuredMovies.map((movie, index) => (
         <div
           key={movie.id}
