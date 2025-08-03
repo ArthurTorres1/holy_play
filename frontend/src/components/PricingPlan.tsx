@@ -30,10 +30,10 @@ const PricingPlan = () => {
             </div>
             <h3 className="text-3xl font-bold text-white mb-2">Plano Anual</h3>
             <div className="text-6xl font-bold text-white mb-2">
-              R$ 89,90
+              R$ 97,90
               <span className="text-lg font-normal text-red-200">/ano</span>
             </div>
-            <p className="text-red-200">Menos de R$ 7,50 por mês</p>
+            <p className="text-red-200">Menos de R$ 8,50 por mês</p>
           </div>
           
           <div className="grid md:grid-cols-2 gap-4 mb-8">
