@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3077:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    networks:
+      - holy-play-network
+
+  # Descomente se você tiver um backend
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   restart: unless-stopped
+  #   environment:
+  #     - NODE_ENV=production
+  #   networks:
+  #     - holy-play-network
+
+networks:
+  holy-play-network:
+    driver: bridge 
