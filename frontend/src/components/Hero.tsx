@@ -85,14 +85,14 @@ const Hero = () => {
       
       <button
         onClick={prevSlide}
-        className="absolute left-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+        className="absolute left-6 md:top-1/2 md:transform md:-translate-y-1/2 bottom-32 md:bottom-auto z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
       
       <button
         onClick={nextSlide}
-        className="absolute right-6 top-1/2 transform -translate-y-1/2 z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+        className="absolute right-6 md:top-1/2 md:transform md:-translate-y-1/2 bottom-32 md:bottom-auto z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
       >
         <ChevronRight className="h-6 w-6" />
       </button>
