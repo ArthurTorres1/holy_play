@@ -26,10 +26,31 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      // Validar tipo de arquivo
-      const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm'];
-      if (!allowedTypes.includes(selectedFile.type)) {
-        alert('Tipo de arquivo não suportado. Use MP4, AVI, MOV, WMV, FLV ou WebM.');
+      // Validação de tipo de arquivo (ampla, cobrindo iOS/Android e formatos comuns)
+      // Observação: alguns dispositivos retornam type vazio, então fazemos fallback por extensão
+      const allowedMimeTypes = [
+        'video/mp4',
+        'video/quicktime',        // MOV (iOS)
+        'video/x-msvideo',        // AVI
+        'video/x-ms-wmv',         // WMV
+        'video/x-flv',            // FLV
+        'video/webm',
+        'video/3gpp',             // 3GP (Android)
+        'video/3gpp2',            // 3G2
+        'video/x-matroska',       // MKV
+      ];
+
+      const allowedExtensions = [
+        '.mp4', '.m4v', '.mov', '.avi', '.wmv', '.flv', '.webm', '.3gp', '.3g2', '.mkv'
+      ];
+
+      const fileType = selectedFile.type?.toLowerCase();
+      const fileName = selectedFile.name?.toLowerCase() || '';
+      const hasAllowedMime = !!fileType && (fileType.startsWith('video/') || allowedMimeTypes.includes(fileType));
+      const hasAllowedExt = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+      if (!hasAllowedMime && !hasAllowedExt) {
+        alert('Tipo de arquivo não suportado. Formatos aceitos: MP4, MOV, M4V, AVI, WMV, FLV, WebM, 3GP, 3G2, MKV.');
         return;
       }
 
@@ -238,7 +259,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                       <p className="text-white">Arraste e solte seu vídeo aqui</p>
                       <p className="text-gray-400">ou clique para selecionar</p>
                       <p className="text-sm text-gray-500">
-                        Formatos suportados: MP4, AVI, MOV, WMV, FLV, WebM
+                        Formatos suportados: MP4, MOV, M4V, AVI, WMV, FLV, WebM, 3GP, 3G2, MKV
                       </p>
                     </div>
                   )}
