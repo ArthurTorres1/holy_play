@@ -26,7 +26,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      // Validação de tipo de arquivo (ampla, cobrindo iOS/Android e formatos comuns)
+      // Validação de tipo de arquivo (ampla, cobrindo iOS/Android e formatos comuns) kspsaodfoodoadapddaabdoa
       // Observação: alguns dispositivos retornam type vazio, então fazemos fallback por extensão
       const allowedMimeTypes = [
         'video/mp4',

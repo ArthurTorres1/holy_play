@@ -1,12 +1,33 @@
 // Serviço para integração com Bunny.net Stream API
 import axios from 'axios';
 
-// Configurações da API
+// Configurações da API (somente via .env do Vite)
 const BUNNY_STREAM_API_BASE = 'https://video.bunnycdn.com';
-const BUNNY_LIBRARY_ID = import.meta.env.VITE_BUNNY_LIBRARY_ID || '495345';
-const BUNNY_API_KEY = import.meta.env.VITE_BUNNY_API_KEY || '4df82cca-1d1f-4d44-b909b4b86c37-6c56-42d0';
-// Host CDN opcional (igual ao exibido no painel: ex.: vz-bd4c92e2-d01b-cdn.net)
-const BUNNY_CDN_HOST = (import.meta as any).env?.VITE_BUNNY_CDN_HOST as string | undefined;
+const { VITE_BUNNY_LIBRARY_ID, VITE_BUNNY_API_KEY, VITE_BUNNY_CDN_HOST } = (import.meta as any).env ?? {};
+
+// Validação das variáveis obrigatórias
+function mask(val?: string) {
+  if (!val) return 'AUSENTE';
+  if (val.length <= 8) return `${val[0]}***`;
+  return `${val.slice(0, 6)}...`;
+}
+
+if (!VITE_BUNNY_LIBRARY_ID || !VITE_BUNNY_API_KEY) {
+  // Nunca exponha a chave completa nos logs
+  // Dê instruções claras para configurar o .env corretamente
+  const libMask = mask(VITE_BUNNY_LIBRARY_ID);
+  const keyMask = mask(VITE_BUNNY_API_KEY);
+  throw new Error(
+    `[Config Bunny] Variáveis de ambiente ausentes. ` +
+    `VITE_BUNNY_LIBRARY_ID=${libMask} | VITE_BUNNY_API_KEY=${keyMask}. ` +
+    `Defina-as no arquivo .env (prefixo VITE_) e reinicie o dev server.`
+  );
+}
+
+const BUNNY_LIBRARY_ID: string = VITE_BUNNY_LIBRARY_ID as string;
+const BUNNY_API_KEY: string = VITE_BUNNY_API_KEY as string;
+// Host CDN opcional (igual ao exibido no painel: ex.: vz-xxxx.b-cdn.net)
+const BUNNY_CDN_HOST: string | undefined = VITE_BUNNY_CDN_HOST as string | undefined;
 
 // Configuração do axios
 const bunnyApi = axios.create({
