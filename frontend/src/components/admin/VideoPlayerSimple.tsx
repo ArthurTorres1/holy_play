@@ -9,7 +9,7 @@ interface VideoPlayerSimpleProps {
 }
 
 const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, onStatusChange }) => {
-  const playerUrl = `https://iframe.mediadelivery.net/embed/495345/${video.videoId}`;
+  const playerUrl = bunnyStreamService.getPlayerUrl(video.videoId);
 
   // Estado local para refletir atualizações do Bunny
   const [status, setStatus] = useState<number>(video.status);
@@ -40,19 +40,11 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
     let timer: number | undefined;
     const fetchStatus = async () => {
       try {
-        const resp = await fetch(`https://video.bunnycdn.com/library/495345/videos/${video.videoId}`, {
-          headers: {
-            'AccessKey': '4df82cca-1d1f-4d44-b909b4b86c37-6c56-42d0',
-            'accept': 'application/json',
-          },
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          setStatus(data.status);
-          setAvailableResolutions(data.availableResolutions || '');
-          if (onStatusChange) {
-            onStatusChange(video.videoId, data.status, data.availableResolutions || '');
-          }
+        const data = await bunnyStreamService.getVideo(video.videoId);
+        setStatus(data.status);
+        setAvailableResolutions(data.availableResolutions || '');
+        if (onStatusChange) {
+          onStatusChange(video.videoId, data.status, data.availableResolutions || '');
         }
       } catch (_) {
         // silencioso
@@ -129,23 +121,13 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
                     <button
                       onClick={async () => {
                         try {
-                          const response = await fetch(`https://video.bunnycdn.com/library/495345/videos/${video.videoId}`, {
-                            headers: {
-                              'AccessKey': '4df82cca-1d1f-4d44-b909b4b86c37-6c56-42d0',
-                              'Content-Type': 'application/json',
-                            }
-                          });
-                          if (response.ok) {
-                            const data = await response.json();
-                            setStatus(data.status);
-                            setAvailableResolutions(data.availableResolutions || '');
-                            if (onStatusChange) {
-                              onStatusChange(video.videoId, data.status, data.availableResolutions || '');
-                            }
-                            alert(`Status atualizado: ${data.status}\nResoluções: ${data.availableResolutions || '(vazio)'}`);
-                          } else {
-                            alert(`Erro ao verificar status: ${response.status}`);
+                          const data = await bunnyStreamService.getVideo(video.videoId);
+                          setStatus(data.status);
+                          setAvailableResolutions(data.availableResolutions || '');
+                          if (onStatusChange) {
+                            onStatusChange(video.videoId, data.status, data.availableResolutions || '');
                           }
+                          alert(`Status atualizado: ${data.status}\nResoluções: ${data.availableResolutions || '(vazio)'}`);
                         } catch (error) {
                           alert(`Erro: ${error}`);
                         }
