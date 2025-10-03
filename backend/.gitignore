@@ -1,0 +1,24 @@
+# Maven build output
+/target/
+
+# IDEs
+/.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local env/profiles (não versionar segredos)
+src/main/resources/application.properties
+src/main/resources/*.secrets.properties
+
+# Docker
+*.env
+.env
