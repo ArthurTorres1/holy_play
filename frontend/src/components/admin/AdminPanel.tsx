@@ -159,6 +159,18 @@ const AdminPanel: React.FC = () => {
     loadVideos();
   }, []);
 
+  // Busca a descrição salva no backend por videoId
+  const getBackendDescription = async (videoId: string): Promise<string | null> => {
+    try {
+      const resp = await fetch(`/api/videos/${videoId}/description`);
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return (data && typeof data.description === 'string') ? data.description : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   // Função para verificar se há vídeos em processamento
   const hasProcessingVideos = (videoList: Video[]): boolean => {
     return videoList.some(video => {
@@ -257,11 +269,12 @@ const AdminPanel: React.FC = () => {
         response.items.map(async (v) => {
           try {
             const detail = await bunnyStreamService.getVideo(v.videoId);
-            
+            // Busca descrição do backend e prioriza sobre a da Bunny
+            const backendDesc = await getBackendDescription(v.videoId);
             return {
               ...v,
               title: detail.title || v.title,
-              description: detail.description ?? v.description,
+              description: backendDesc ?? detail.description ?? v.description,
               thumbnailUrl: detail.thumbnailUrl || v.thumbnailUrl,
               availableResolutions: detail.availableResolutions || v.availableResolutions,
               status: detail.status ?? v.status,

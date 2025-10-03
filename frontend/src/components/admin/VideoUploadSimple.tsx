@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
+﻿import React, { useState, useRef, useMemo } from 'react';
+import axios from 'axios';
 import { X, Upload, CheckCircle, AlertCircle, Crosshair, Image as ImageIcon } from 'lucide-react';
 import bunnyStreamService from '../../services/bunnyStreamApi';
 
@@ -15,34 +16,19 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const [step, setStep] = useState<'form' | 'uploading' | 'success' | 'error'>('form');
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Thumbnail opcional
   const [thumbFile, setThumbFile] = useState<File | null>(null);
-  const [posX, setPosX] = useState(50); // 0..100
-  const [posY, setPosY] = useState(50); // 0..100
   const thumbInputRef = useRef<HTMLInputElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
+  const thumbPreviewUrl = useMemo(() => (thumbFile ? URL.createObjectURL(thumbFile) : ''), [thumbFile]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-      // Validação de tipo de arquivo (ampla, cobrindo iOS/Android e formatos comuns) kspsaodfoodoadapddaabdoa
-      // Observação: alguns dispositivos retornam type vazio, então fazemos fallback por extensão
       const allowedMimeTypes = [
-        'video/mp4',
-        'video/quicktime',        // MOV (iOS)
-        'video/x-msvideo',        // AVI
-        'video/x-ms-wmv',         // WMV
-        'video/x-flv',            // FLV
-        'video/webm',
-        'video/3gpp',             // 3GP (Android)
-        'video/3gpp2',            // 3G2
-        'video/x-matroska',       // MKV
+        'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/x-flv', 'video/webm', 'video/3gpp', 'video/3gpp2', 'video/x-matroska'
       ];
-
-      const allowedExtensions = [
-        '.mp4', '.m4v', '.mov', '.avi', '.wmv', '.flv', '.webm', '.3gp', '.3g2', '.mkv'
-      ];
+      const allowedExtensions = ['.mp4', '.m4v', '.mov', '.avi', '.wmv', '.flv', '.webm', '.3gp', '.3g2', '.mkv'];
 
       const fileType = selectedFile.type?.toLowerCase();
       const fileName = selectedFile.name?.toLowerCase() || '';
@@ -55,9 +41,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
       }
 
       setFile(selectedFile);
-      if (!title) {
-        setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''));
-      }
+      if (!title) setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''));
     }
   };
 
@@ -69,34 +53,6 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
       return;
     }
     setThumbFile(f);
-    // centraliza por padrão
-    setPosX(50);
-    setPosY(50);
-  };
-
-  const thumbPreviewUrl = useMemo(() => (thumbFile ? URL.createObjectURL(thumbFile) : ''), [thumbFile]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    draggingRef.current = true;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    updateFromEvent(e);
-  };
-  const onPointerUp = (e: React.PointerEvent) => {
-    draggingRef.current = false;
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!draggingRef.current) return;
-    updateFromEvent(e);
-  };
-  const updateFromEvent = (e: React.PointerEvent) => {
-    const el = previewRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setPosX(Math.max(0, Math.min(100, x)));
-    setPosY(Math.max(0, Math.min(100, y)));
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -106,10 +62,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(droppedFile);
       fileInputRef.current.files = dataTransfer.files;
-      
-      const fakeEvent = {
-        target: fileInputRef.current
-      } as React.ChangeEvent<HTMLInputElement>;
+      const fakeEvent = { target: fileInputRef.current } as React.ChangeEvent<HTMLInputElement>;
       handleFileSelect(fakeEvent);
     }
   };
@@ -122,17 +75,16 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    
+
     if (!title.trim()) {
       alert('Por favor, insira um título para o vídeo.');
       return;
     }
-
     if (!file) {
       alert('Por favor, selecione um arquivo de vídeo.');
       return;
@@ -141,66 +93,41 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
     try {
       setUploading(true);
       setStep('uploading');
-      // reset states visuais se necessário
 
-      // Passo 1: Criar o vídeo na API (apenas metadados) usando o serviço (usa .env)
+      // Passo 1: Criar o vídeo (metadados)
       const created = await bunnyStreamService.createVideo(title.trim(), description.trim() || undefined);
       const videoId = created.videoId;
 
-      // Passo 2: Upload do arquivo usando o serviço
+      // Passo 2: Upload do arquivo
       await bunnyStreamService.uploadVideoFile(videoId, file);
 
-      // Passo 2.1: Garantir metadados (description) persistidos
+      // Passo 2.1: Atualizar metadados
       try {
         await bunnyStreamService.updateVideo(videoId, title.trim(), description.trim() || undefined);
       } catch (e) {
         console.warn('Não foi possível confirmar atualização de metadados, seguindo assim mesmo:', e);
       }
 
-      // Passo 3 (opcional): se usuário escolheu uma thumb, gerar e enviar como thumbnail do vídeo
+      // Passo 2.2: Persistir a descrição no backend
+      if (description && description.trim().length > 0) {
+        try {
+          await axios.post(`/api/videos/${videoId}/description`, { description: description.trim() });
+        } catch (e) {
+          console.warn('Falha ao salvar descrição no backend:', e);
+        }
+      }
+
+      // Passo 3 (opcional): Enviar thumbnail simples (sem crop)
       if (thumbFile) {
         try {
-          const targetW = 1280;
-          const targetH = 720;
-          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = () => reject(new Error('Falha ao carregar a thumbnail'));
-            image.src = URL.createObjectURL(thumbFile);
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = targetW;
-          canvas.height = targetH;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Canvas não suportado');
-          const imgW = img.naturalWidth || img.width;
-          const imgH = img.naturalHeight || img.height;
-          const scale = Math.max(targetW / imgW, targetH / imgH);
-          const drawW = imgW * scale;
-          const drawH = imgH * scale;
-          const fx = Math.max(0, Math.min(100, posX)) / 100;
-          const fy = Math.max(0, Math.min(100, posY)) / 100;
-          let dx = -(drawW - targetW) * fx;
-          let dy = -(drawH - targetH) * fy;
-          dx = Math.min(0, Math.max(dx, targetW - drawW));
-          dy = Math.min(0, Math.max(dy, targetH - drawH));
-          ctx.drawImage(img, dx, dy, drawW, drawH);
-          const blob: Blob = await new Promise((resolve, reject) => {
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao gerar imagem'))), 'image/jpeg', 0.9);
-          });
-          const outFile = new File([blob], `thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          await bunnyStreamService.uploadThumbnail(videoId, outFile);
+          await bunnyStreamService.uploadThumbnail(videoId, thumbFile);
         } catch (err) {
-          console.warn('Falha ao aplicar thumbnail customizada, seguindo sem ela:', err);
+          console.warn('Falha ao enviar thumbnail, seguindo sem ela:', err);
         }
       }
 
       setStep('success');
-      // Dar um tempo para a API propagar metadados e a thumb
-      setTimeout(() => {
-        onSuccess();
-      }, 3000);
-
+      setTimeout(() => onSuccess(), 1500);
     } catch (error) {
       console.error('Erro no upload:', error);
       setError(`Erro ao fazer upload do vídeo: ${error}`);
@@ -216,10 +143,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-2xl font-bold text-white">Upload de Vídeo</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X size={24} />
           </button>
         </div>
@@ -227,11 +151,9 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
         <div className="p-6">
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* File Upload Area */}
+              {/* Área de Upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Arquivo de Vídeo *
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Arquivo de Vídeo *</label>
                 <div
                   className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-gray-500 transition-colors cursor-pointer"
                   onDrop={handleDrop}
@@ -245,7 +167,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  
+
                   {file ? (
                     <div className="space-y-2">
                       <CheckCircle className="mx-auto text-green-400" size={48} />
@@ -266,7 +188,7 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                 </div>
               </div>
 
-              {/* Thumbnail opcional (fora do container do vídeo) */}
+              {/* Thumbnail opcional */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <ImageIcon size={18} className="text-gray-300" />
@@ -287,40 +209,24 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                   >
                     <Upload size={18} /> Selecionar Imagem
                   </button>
-                  <p className="text-xs text-gray-400 text-center">JPG, PNG, WebP • 16:9 recomendado (1280×720)</p>
+                  <p className="text-xs text-gray-400 text-center">JPG, PNG, WebP - 16:9 recomendado (1280x720)</p>
 
-                  {/* Pré-visualização com arraste */}
                   {thumbFile && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2"><Crosshair size={16} />Pré-visualização (arraste para enquadrar)</h4>
-                      <div
-                        ref={previewRef}
-                        className="w-full aspect-video rounded-lg overflow-hidden border border-gray-700 bg-gray-800 relative touch-none select-none"
-                        onPointerDown={onPointerDown}
-                        onPointerUp={onPointerUp}
-                        onPointerMove={onPointerMove}
-                      >
-                        <img
-                          src={thumbPreviewUrl}
-                          alt="Pré-visualização"
-                          className="w-full h-full object-cover"
-                          style={{ objectPosition: `${posX}% ${posY}%` }}
-                        />
-                        <div
-                          className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white bg-white/40 pointer-events-none"
-                          style={{ left: `${posX}%`, top: `${posY}%` }}
-                        />
+                    <>
+                      <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                        <Crosshair size={16} />Pré-visualização
+                      </h4>
+                      <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-700 bg-gray-800 relative">
+                        <img src={thumbPreviewUrl} alt="Pré-visualização" className="w-full h-full object-cover" />
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
 
-              {/* Title */}
+              {/* Título */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Título *
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Título *</label>
                 <input
                   type="text"
                   value={title}
@@ -331,11 +237,9 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                 />
               </div>
 
-              {/* Description */}
+              {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -345,20 +249,12 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                 />
               </div>
 
-              {/* Submit Button */}
+              {/* Ações */}
               <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                >
+                <button type="button" onClick={onClose} className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={!file || !title.trim() || uploading}
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                >
+                <button type="submit" disabled={!file || !title.trim() || uploading} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors">
                   Fazer Upload
                 </button>
               </div>
@@ -381,12 +277,8 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
               <CheckCircle className="mx-auto text-green-400" size={64} />
               <div>
                 <h3 className="text-xl font-semibold text-white mb-2">Upload Concluído!</h3>
-                <p className="text-gray-400">
-                  Seu vídeo foi enviado com sucesso e está sendo processado.
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  O processamento pode levar alguns minutos dependendo do tamanho do arquivo.
-                </p>
+                <p className="text-gray-400">Seu vídeo foi enviado com sucesso e está sendo processado.</p>
+                <p className="text-sm text-gray-500 mt-2">O processamento pode levar alguns minutos dependendo do tamanho do arquivo.</p>
               </div>
             </div>
           )}
@@ -398,18 +290,8 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                 <h3 className="text-xl font-semibold text-white mb-2">Erro no Upload</h3>
                 <p className="text-gray-400 mb-4">{error}</p>
                 <div className="flex gap-4">
-                  <button
-                    onClick={onClose}
-                    className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                  >
-                    Fechar
-                  </button>
-                  <button
-                    onClick={() => setStep('form')}
-                    className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    Tentar Novamente
-                  </button>
+                  <button onClick={onClose} className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">Fechar</button>
+                  <button onClick={() => setStep('form')} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">Tentar Novamente</button>
                 </div>
               </div>
             </div>

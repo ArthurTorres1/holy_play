@@ -15,6 +15,7 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
   const [status, setStatus] = useState<number>(video.status);
   const [availableResolutions, setAvailableResolutions] = useState<string>(video.availableResolutions || '');
   const [details, setDetails] = useState<Video>(video);
+  const [backendDescription, setBackendDescription] = useState<string | null>(null);
 
   // Buscar detalhes atualizados ao abrir o modal (garante description, views, etc.)
   useEffect(() => {
@@ -30,6 +31,19 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
         }
       } catch (e) {
         // silencioso
+      }
+
+      // Busca descrição do backend e prioriza na exibição
+      try {
+        const resp = await fetch(`/api/videos/${video.videoId}/description`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (!cancelled) setBackendDescription(typeof data?.description === 'string' ? data.description : null);
+        } else if (!cancelled) {
+          setBackendDescription(null);
+        }
+      } catch (_) {
+        if (!cancelled) setBackendDescription(null);
       }
     })();
     return () => { cancelled = true; };
@@ -156,12 +170,12 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
             </div>
           )}
 
-          {/* Descrição */}
-          {details.description && (
+          {/* Descrição (prioriza backend) */}
+          {(backendDescription || details.description) && (
             <div className="mt-6 bg-gray-700 p-4 rounded-lg">
               <h4 className="text-sm text-gray-300 mb-2">Descrição</h4>
               <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
-                {details.description}
+                {backendDescription ?? details.description}
               </p>
             </div>
           )}
