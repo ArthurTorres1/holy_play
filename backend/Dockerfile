@@ -9,7 +9,11 @@ RUN mvn -q -e -DskipTests dependency:go-offline
 # Copia o restante do código e faz o build do jar
 COPY src ./src
 RUN mvn -q -DskipTests package && \
-    ls -la target
+    echo "Arquivos gerados em target:" && ls -la target && \
+    # Seleciona o JAR executável (exclui sources/original) e renomeia para app.jar
+    JAR_FILE=$(ls target/*.jar | grep -Ev '(sources|original)') && \
+    cp "$JAR_FILE" /app/app.jar && \
+    ls -la /app
 
 # ---- Run stage ----
 FROM eclipse-temurin:21-jre
@@ -19,8 +23,8 @@ WORKDIR /app
 ENV JAVA_OPTS="" \
     SERVER_PORT=8080
 
-# Copia o jar produzido
-COPY --from=build /app/target/*-SNAPSHOT.jar /app/app.jar
+# Copia o JAR renomeado pelo stage de build
+COPY --from=build /app/app.jar /app/app.jar
 
 EXPOSE 8080
 
