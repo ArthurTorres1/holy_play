@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { X, Upload, CheckCircle, AlertCircle, Crosshair, Image as ImageIcon } from 'lucide-react';
 import bunnyStreamService from '../../services/bunnyStreamApi';
@@ -111,7 +111,8 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
       // Passo 2.2: Persistir a descrição no backend
       if (description && description.trim().length > 0) {
         try {
-          await axios.post(`/api/videos/${videoId}/description`, { description: description.trim() });
+          const apiBase = (import.meta as any).env?.VITE_API_BASE || '';
+          await axios.post(`${apiBase}/api/videos/${videoId}/description`, { description: description.trim() });
         } catch (e) {
           console.warn('Falha ao salvar descrição no backend:', e);
         }

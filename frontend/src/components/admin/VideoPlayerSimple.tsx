@@ -35,7 +35,8 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
 
       // Busca descrição do backend e prioriza na exibição
       try {
-        const resp = await fetch(`/api/videos/${video.videoId}/description`);
+        const apiBase = (import.meta as any).env?.VITE_API_BASE || '';
+        const resp = await fetch(`${apiBase}/api/videos/${video.videoId}/description`);
         if (resp.ok) {
           const data = await resp.json();
           if (!cancelled) setBackendDescription(typeof data?.description === 'string' ? data.description : null);
