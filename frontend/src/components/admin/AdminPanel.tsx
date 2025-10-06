@@ -163,9 +163,21 @@ const AdminPanel: React.FC = () => {
   const getBackendDescription = async (videoId: string): Promise<string | null> => {
     try {
       const resp = await fetch(`/api/videos/${videoId}/description`);
-      if (!resp.ok) return null;
-      const data = await resp.json();
-      return (data && typeof data.description === 'string') ? data.description : null;
+      if (!resp.ok) {
+        if (resp.status === 304) return null;
+        return null;
+      }
+      const ct = resp.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const data = await resp.json();
+        if (data && typeof data.description === 'string') return data.description;
+        // Caso o backend envie direto a string dentro do JSON
+        if (typeof data === 'string') return data || null;
+        return null;
+      } else {
+        const text = (await resp.text()).trim();
+        return text.length > 0 ? text : null;
+      }
     } catch (e) {
       return null;
     }

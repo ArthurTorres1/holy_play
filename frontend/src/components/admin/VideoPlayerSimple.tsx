@@ -37,8 +37,19 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
       try {
         const resp = await fetch(`/api/videos/${video.videoId}/description`);
         if (resp.ok) {
-          const data = await resp.json();
-          if (!cancelled) setBackendDescription(typeof data?.description === 'string' ? data.description : null);
+          const ct = resp.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            const data = await resp.json();
+            if (!cancelled) {
+              const value = typeof data?.description === 'string' ? data.description : (typeof data === 'string' ? data : null);
+              setBackendDescription(value);
+            }
+          } else {
+            const text = (await resp.text()).trim();
+            if (!cancelled) setBackendDescription(text.length > 0 ? text : null);
+          }
+        } else if (resp.status === 304) {
+          if (!cancelled) setBackendDescription(null);
         } else if (!cancelled) {
           setBackendDescription(null);
         }
@@ -84,8 +95,8 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <div>
             <h2 className="text-2xl font-bold text-white">{details.title}</h2>
-            {details.description && (
-              <p className="text-gray-400 mt-1">{details.description}</p>
+            {(backendDescription || details.description) && (
+              <p className="text-gray-400 mt-1">{backendDescription ?? details.description}</p>
             )}
           </div>
           <button
