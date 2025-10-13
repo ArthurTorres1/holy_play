@@ -13,6 +13,10 @@ public class PortConfig implements WebServerFactoryCustomizer<ConfigurableWebSer
     
     @Override
     public void customize(ConfigurableWebServerFactory factory) {
+        System.out.println("🔧 PortConfig executando...");
+        System.out.println("🔧 SERVER_PORT do ambiente: " + System.getenv("SERVER_PORT"));
+        System.out.println("🔧 Porta configurada: " + serverPort);
+        
         factory.setPort(serverPort);
         System.out.println("🚀 Servidor configurado para porta: " + serverPort);
     }
