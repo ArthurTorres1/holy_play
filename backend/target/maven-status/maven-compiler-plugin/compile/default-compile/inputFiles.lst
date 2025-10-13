@@ -1,12 +1,14 @@
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\domain\health\DatabaseProbe.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\application\video\GetVideoDescriptionUseCase.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\application\health\CheckDatabaseHealthUseCase.java
+C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\config\PortConfig.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\video\dto\VideoDescriptionResponse.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\infrastructure\health\PostgresDatabaseProbe.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\domain\video\VideoDescription.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\domain\video\VideoDescriptionRepository.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\application\video\CreateOrUpdateVideoDescriptionUseCase.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\video\dto\UpsertVideoDescriptionRequest.java
+C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\config\ServerConfig.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\health\HealthController.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\infrastructure\video\VideoDescriptionJdbcRepository.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\HolyplayBackendApplication.java
