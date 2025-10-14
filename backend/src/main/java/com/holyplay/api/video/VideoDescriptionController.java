@@ -15,6 +15,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/videos")
+@CrossOrigin(origins = {"http://localhost:5173", "https://holyplay.com.br"})
 public class VideoDescriptionController {
 
     private final CreateOrUpdateVideoDescriptionUseCase createOrUpdate;
@@ -40,7 +41,11 @@ public class VideoDescriptionController {
             @PathVariable @NotBlank @Size(max = 128) String videoId
     ) {
         Optional<VideoDescription> opt = getByVideoId.execute(videoId);
-        return opt.map(v -> ResponseEntity.ok(toResponse(v)))
+        return opt.map(v -> ResponseEntity.ok()
+                        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                        .header("Pragma", "no-cache")
+                        .header("Expires", "0")
+                        .body(toResponse(v)))
                   .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
