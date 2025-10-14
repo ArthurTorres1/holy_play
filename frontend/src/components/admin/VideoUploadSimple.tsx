@@ -111,8 +111,8 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
       // Passo 2.2: Persistir a descrição no backend
       if (description && description.trim().length > 0) {
         try {
-          const { getApiUrl } = await import('../../utils/api');
-          await axios.post(getApiUrl(`api/videos/${videoId}/description`), { description: description.trim() });
+          const { buildApiUrl } = await import('../../config/api');
+          await axios.post(buildApiUrl(`api/videos/${videoId}/description`), { description: description.trim() });
         } catch (e) {
           console.warn('Falha ao salvar descrição no backend:', e);
         }
