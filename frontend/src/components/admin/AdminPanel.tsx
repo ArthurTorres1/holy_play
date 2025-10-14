@@ -162,7 +162,8 @@ const AdminPanel: React.FC = () => {
   // Busca a descrição salva no backend por videoId
   const getBackendDescription = async (videoId: string): Promise<string | null> => {
     try {
-      const resp = await fetch(`/api/videos/${videoId}/description`);
+      const { apiFetch } = await import('../../utils/api');
+      const resp = await apiFetch(`api/videos/${videoId}/description`);
       if (!resp.ok) {
         if (resp.status === 304) return null;
         return null;

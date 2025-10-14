@@ -35,7 +35,8 @@ const VideoPlayerSimple: React.FC<VideoPlayerSimpleProps> = ({ video, onClose, o
 
       // Busca descrição do backend e prioriza na exibição
       try {
-        const resp = await fetch(`/api/videos/${video.videoId}/description`);
+        const { apiFetch } = await import('../../utils/api');
+        const resp = await apiFetch(`api/videos/${video.videoId}/description`);
         if (resp.ok) {
           const ct = resp.headers.get('content-type') || '';
           if (ct.includes('application/json')) {
