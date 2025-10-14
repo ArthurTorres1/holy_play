@@ -15,7 +15,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/videos")
-@CrossOrigin(origins = {"http://localhost:5173", "https://holyplay.com.br"})
 public class VideoDescriptionController {
 
     private final CreateOrUpdateVideoDescriptionUseCase createOrUpdate;

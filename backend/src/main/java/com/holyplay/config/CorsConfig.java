@@ -10,37 +10,33 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
-    @Value("${cors.allowed.origins:http://localhost:5173,https://holyplay.com.br}")
+    @Value("${cors.allowed.origins:http://localhost:5173,https://holyplay.com.br,http://back.holyplay.com.br:7695,https://back.holyplay.com.br}")
     private String allowedOrigins;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        
         registry.addMapping("/api/**")
-                .allowedOrigins(origins.toArray(new String[0]))
+                .allowedOrigins("*")  // PERMITE TODAS AS ORIGENS
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true)
+                .allowCredentials(false)  // Deve ser false quando allowedOrigins é "*"
                 .maxAge(3600);
                 
-        System.out.println("🌐 CORS configurado para origins: " + origins);
+        System.out.println("🌐 CORS configurado para TODAS as origens (*)");
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
         
-        configuration.setAllowedOrigins(origins);
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));  // PERMITE TODAS AS ORIGENS
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(false);  // Deve ser false com "*"
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

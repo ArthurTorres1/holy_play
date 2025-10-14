@@ -1,0 +1,4 @@
+/*
+  Content-Security-Policy: upgrade-insecure-requests; connect-src 'self' http://back.holyplay.com.br:7695 https://back.holyplay.com.br;
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
