@@ -41,4 +41,20 @@ public class TestController {
         response.put("timestamp", System.currentTimeMillis());
         return response;
     }
+    
+    @GetMapping("/test/database")
+    public Map<String, Object> testDatabase() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            response.put("status", "OK");
+            response.put("message", "Teste de conectividade com banco");
+            response.put("timestamp", System.currentTimeMillis());
+            // Aqui poderia testar uma query simples se necessário
+        } catch (Exception e) {
+            response.put("status", "ERROR");
+            response.put("error", e.getMessage());
+            response.put("timestamp", System.currentTimeMillis());
+        }
+        return response;
+    }
 }

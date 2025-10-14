@@ -15,6 +15,15 @@ public class GetVideoDescriptionUseCase {
     }
 
     public Optional<VideoDescription> execute(String videoId) {
-        return repository.findByVideoId(videoId);
+        try {
+            System.out.println("🔍 USE CASE: Executando busca para videoId: " + videoId);
+            Optional<VideoDescription> result = repository.findByVideoId(videoId);
+            System.out.println("🔍 USE CASE: Resultado do repository: " + result.isPresent());
+            return result;
+        } catch (Exception e) {
+            System.err.println("❌ ERRO no USE CASE: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

@@ -40,13 +40,30 @@ public class VideoDescriptionController {
     public ResponseEntity<VideoDescriptionResponse> get(
             @PathVariable @NotBlank @Size(max = 128) String videoId
     ) {
-        Optional<VideoDescription> opt = getByVideoId.execute(videoId);
-        return opt.map(v -> ResponseEntity.ok()
-                        .header("Cache-Control", "no-cache, no-store, must-revalidate")
-                        .header("Pragma", "no-cache")
-                        .header("Expires", "0")
-                        .body(toResponse(v)))
-                  .orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            System.out.println("🔍 DEBUG: Buscando descrição para videoId: " + videoId);
+            System.out.println("🔍 DEBUG: Tamanho do videoId: " + videoId.length());
+            
+            Optional<VideoDescription> opt = getByVideoId.execute(videoId);
+            System.out.println("🔍 DEBUG: Resultado encontrado: " + opt.isPresent());
+            
+            return opt.map(v -> {
+                        System.out.println("🔍 DEBUG: Retornando descrição: " + v.getDescription());
+                        return ResponseEntity.ok()
+                                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                                .header("Pragma", "no-cache")
+                                .header("Expires", "0")
+                                .body(toResponse(v));
+                    })
+                    .orElseGet(() -> {
+                        System.out.println("🔍 DEBUG: Nenhuma descrição encontrada para videoId: " + videoId);
+                        return ResponseEntity.notFound().build();
+                    });
+        } catch (Exception e) {
+            System.err.println("❌ ERRO ao buscar descrição: " + e.getMessage());
+            e.printStackTrace();
+            throw e; // Re-throw para ver o stack trace completo
+        }
     }
 
     private static VideoDescriptionResponse toResponse(VideoDescription vd) {
