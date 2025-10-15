@@ -27,10 +27,10 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onClose, onSuccess }) => {
         return;
       }
 
-      // Validar tamanho (máximo 2GB)
-      const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+      // Validar tamanho (máximo 10GB)
+      const maxSize = 10 * 1024 * 1024 * 1024; // 10GB
       if (selectedFile.size > maxSize) {
-        alert('Arquivo muito grande. O tamanho máximo é 2GB.');
+        alert('Arquivo muito grande. O tamanho máximo é 10GB.');
         return;
       }
 
@@ -162,7 +162,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onClose, onSuccess }) => {
                       <p className="text-white">Arraste e solte seu vídeo aqui</p>
                       <p className="text-gray-400">ou clique para selecionar</p>
                       <p className="text-sm text-gray-500">
-                        Formatos suportados: MP4, AVI, MOV, WMV, FLV, WebM (máx. 2GB)
+                        Formatos suportados: MP4, AVI, MOV, WMV, FLV, WebM (máx. 10GB)
                       </p>
                     </div>
                   )}
