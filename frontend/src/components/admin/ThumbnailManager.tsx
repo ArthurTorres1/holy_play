@@ -226,130 +226,183 @@ const ThumbnailManager: React.FC<ThumbnailManagerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="relative max-w-2xl w-full rounded-xl border border-gray-800 bg-black/90 backdrop-blur-sm p-4 shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[85vh] overflow-y-auto"
+        className="relative max-w-4xl w-full rounded-2xl border border-gray-700/50 bg-gradient-to-br from-gray-900 to-gray-800 backdrop-blur-sm shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Thumbnail</h3>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between p-8 border-b border-gray-700/50">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-600/20 rounded-xl">
+              <ImageIcon className="text-red-400" size={24} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-white">Gerenciar Thumbnail</h3>
+              <p className="text-gray-400 text-sm">Configure a imagem de capa do seu vídeo</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={cropAndUpload}
               disabled={uploading}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold transition-all duration-200 shadow-lg disabled:shadow-none"
             >
-              Aplicar
+              <Crop size={18} />
+              {uploading ? 'Aplicando...' : 'Aplicar'}
             </button>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
-              onPointerCancel={onPointerCancel}
-              onPointerLeave={onPointerLeave}
+              className="text-gray-400 hover:text-white transition-all duration-200 p-2 hover:bg-gray-700/50 rounded-lg"
               aria-label="Fechar"
             >
-              <X size={22} />
+              <X size={24} />
             </button>
           </div>
         </div>
 
-        {/* Video Info */}
-        <div className="mb-4 p-3 bg-gray-800/50 rounded-lg">
-          <h4 className="font-medium text-white mb-1">{video.title}</h4>
-          <p className="text-sm text-gray-400">ID: {video.videoId}</p>
-        </div>
-
-        {/* Upload Custom Thumbnail */}
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <ImageIcon size={20} />
-            Selecione sua Thumbnail
-          </h4>
-          <div className="space-y-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => {
-                console.log('🖱️ Botão clicado, abrindo seletor de arquivo...');
-                fileInputRef.current?.click();
-              }}
-              disabled={uploading}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium text-white"
-            >
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Enviando thumbnail...
-                </>
-              ) : (
-                <>
-                  <Upload size={20} />
-                  Selecionar Imagem
-                </>
-              )}
-            </button>
-            <p className="text-xs text-gray-400 text-center">JPG, PNG ou WebP • 16:9 recomendado (1280×720)</p>
+        <div className="p-8 space-y-8">
+          {/* Video Info */}
+          <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-600/20 rounded-lg">
+                <Crosshair className="text-blue-400" size={20} />
+              </div>
+              <div>
+                <h4 className="font-semibold text-white text-lg">{video.title}</h4>
+                <p className="text-sm text-gray-400">ID: <span className="font-mono">{video.videoId}</span></p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Enquadramento por arraste (sempre cover) */}
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <Crosshair size={20} />
-            Enquadramento (toque/arraste na pré-visualização)
-          </h4>
-          <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-            <span>Toque e arraste (ou clique e arraste) diretamente na imagem para reposicionar.</span>
-            <button
-              onClick={() => setPrefs(p => ({ ...p, posX: 50, posY: 50 }))}
-              className="ml-auto px-2 py-1 rounded border border-gray-600 hover:bg-gray-700 text-gray-200"
-            >Centralizar</button>
-          </div>
-        </div>
-
-        {/* Pré-visualização */}
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <Crop size={20} />
-            Pré-visualização (16:9)
-          </h4>
-          <div
-            ref={previewRef}
-            className="w-full aspect-video rounded-lg overflow-hidden border border-gray-700 bg-gray-800 relative touch-none select-none"
-            onPointerDown={onPointerDown}
-            onPointerUp={onPointerUp}
-            onPointerMove={onPointerMove}
-            onPointerCancel={onPointerCancel}
-            onPointerLeave={onPointerLeave}
-          >
-            {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="Pré-visualização"
-                className={`w-full h-full ${objectFitClass}`}
-                style={{ objectPosition }}
+          {/* Upload Custom Thumbnail */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-600/20 rounded-lg">
+                <Upload className="text-red-400" size={20} />
+              </div>
+              <div>
+                <h4 className="text-xl font-semibold text-white">Nova Thumbnail</h4>
+                <p className="text-gray-400 text-sm">Faça upload de uma imagem personalizada</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6 space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">Sem pré-visualização</div>
-            )}
-            {/* Indicador de foco */}
-            <div
-              className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-white/40 pointer-events-none"
-              style={{ left: `${prefs.posX}%`, top: `${prefs.posY}%` }}
-            />
+              <button
+                onClick={() => {
+                  console.log('🖱️ Botão clicado, abrindo seletor de arquivo...');
+                  fileInputRef.current?.click();
+                }}
+                disabled={uploading}
+                className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 px-6 py-4 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 font-semibold text-white shadow-lg disabled:shadow-none"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    Enviando thumbnail...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={20} />
+                    Selecionar Nova Imagem
+                  </>
+                )}
+              </button>
+              <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+                <span>JPG, PNG ou WebP</span>
+                <span>•</span>
+                <span>16:9 recomendado</span>
+                <span>•</span>
+                <span>1280×720 ideal</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Enquadramento por arraste */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-600/20 rounded-lg">
+                <Crosshair className="text-purple-400" size={20} />
+              </div>
+              <div>
+                <h4 className="text-xl font-semibold text-white">Ajustar Enquadramento</h4>
+                <p className="text-gray-400 text-sm">Clique e arraste na imagem para reposicionar o foco</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-300">Posição do foco na imagem</span>
+                <button
+                  onClick={() => setPrefs(p => ({ ...p, posX: 50, posY: 50 }))}
+                  className="px-3 py-1.5 rounded-lg border border-gray-600/50 hover:bg-gray-700/50 text-gray-300 hover:text-white text-sm transition-all duration-200"
+                >
+                  Centralizar
+                </button>
+              </div>
+              
+              {/* Pré-visualização Interativa */}
+              <div
+                ref={previewRef}
+                className="w-full aspect-video rounded-xl overflow-hidden border-2 border-gray-600/50 bg-gray-800 relative touch-none select-none cursor-crosshair hover:border-purple-500/50 transition-colors duration-200"
+                onPointerDown={onPointerDown}
+                onPointerUp={onPointerUp}
+                onPointerMove={onPointerMove}
+                onPointerCancel={onPointerCancel}
+                onPointerLeave={onPointerLeave}
+              >
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt="Pré-visualização"
+                    className={`w-full h-full ${objectFitClass}`}
+                    style={{ objectPosition }}
+                    draggable={false}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center space-y-2">
+                      <ImageIcon size={48} className="mx-auto opacity-50" />
+                      <p>Sem pré-visualização disponível</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Indicador de foco */}
+                <div
+                  className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full border-2 border-white bg-red-500/80 pointer-events-none shadow-lg animate-pulse"
+                  style={{ left: `${prefs.posX}%`, top: `${prefs.posY}%` }}
+                />
+                
+                {/* Grid de ajuda */}
+                <div className="absolute inset-0 pointer-events-none opacity-20">
+                  <div className="w-full h-full grid grid-cols-3 grid-rows-3">
+                    {Array.from({ length: 9 }).map((_, i) => (
+                      <div key={i} className="border border-white/20" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-center">
+                <p className="text-xs text-gray-400">
+                  Clique e arraste para ajustar o ponto focal • O ponto vermelho indica onde será o centro da imagem
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   );

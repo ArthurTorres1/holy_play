@@ -443,7 +443,10 @@ class BunnyStreamService {
     });
     
     try {
-      // Tentativa 1: POST RAW BINÁRIO (alguns workspaces exigem body = arquivo e Content-Type do arquivo)
+      // Tentativa 1: POST RAW BINÁRIO com timeout reduzido
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+      
       let response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -452,7 +455,10 @@ class BunnyStreamService {
           'Content-Type': thumbnailFile.type || 'application/octet-stream',
         },
         body: thumbnailFile,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       // Tentativa 2: se não OK, tentar multipart com campo 'thumbnail' (nome esperado em algumas contas)
       if (!response.ok) {

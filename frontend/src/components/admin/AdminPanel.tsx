@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Play, Trash2, Edit, Plus, Image } from 'lucide-react';
+import { Upload, Play, Trash2, Edit, Plus, RefreshCw } from 'lucide-react';
 import bunnyStreamService, { Video } from '../../services/bunnyStreamApi';
 import VideoUploadSimple from './VideoUploadSimple';
 import VideoPlayerSimple from './VideoPlayerSimple';
-import ThumbnailManager from './ThumbnailManager';
+import VideoEditor from './VideoEditor';
 import Alert from '../common/Alert';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { useAlert } from '../../hooks/useAlert';
@@ -149,8 +149,8 @@ const AdminPanel: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
-  const [showThumbnailManager, setShowThumbnailManager] = useState(false);
-  const [selectedVideoForThumbnail, setSelectedVideoForThumbnail] = useState<Video | null>(null);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
+  const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<Video | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const { alert, showSuccess, showError, hideAlert } = useAlert();
   const { confirm, showConfirm } = useConfirm();
@@ -421,43 +421,35 @@ const AdminPanel: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40"></div>
       
-      {/* Hero Section */}
-      <div className="relative z-10">
-        <div className="container mx-auto px-6 py-12">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-red-500 to-red-700 bg-clip-text text-transparent">
-              HOLYPLAY
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-300 mb-4 max-w-3xl mx-auto">
-              Painel de Administração de Conteúdo
-            </p>
-            {hasProcessingVideos(videos) && (
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                <span className="text-red-400 text-sm">
-                  Monitorando {videos.filter(v => {
-                    const realStatus = getRealVideoStatus(v);
-                    return realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
-                  }).length} vídeo(s) em processamento...
-                </span>
-              </div>
-            )}
-            <div className="flex flex-wrap justify-center gap-4">
+      {/* Header Moderno */}
+      <div className="relative z-10 container mx-auto px-6 py-8">
+        <div className="bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 mb-8">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            <div className="text-center lg:text-left">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent mb-2">
+                HOLYPLAY
+              </h1>
+              <p className="text-gray-400 text-lg">Painel de Administração de Conteúdo</p>
+              <p className="text-gray-500 text-sm mt-1">Gerencie seus vídeos e configure sua biblioteca</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={() => setShowUpload(true)}
-                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg flex items-center gap-3 transition-all transform hover:scale-105 font-semibold text-lg"
+                className="group bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-semibold shadow-lg hover:shadow-red-500/25 transform hover:scale-105"
               >
-                <Plus size={24} />
-                Novo Vídeo
+                <div className="p-1 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
+                  <Plus size={20} />
+                </div>
+                <span>Adicionar Vídeo</span>
               </button>
               <button
-                onClick={() => {
-                  loadVideos();
-                  showSuccess('Lista atualizada!', 'Os vídeos foram recarregados com sucesso.');
-                }}
-                className="bg-gray-700/80 hover:bg-gray-600/80 px-8 py-4 rounded-lg flex items-center gap-3 transition-all backdrop-blur-sm font-semibold text-lg"
+                onClick={loadVideos}
+                disabled={loading}
+                className="group bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-6 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-medium border border-gray-600/50 hover:border-gray-500"
               >
-                🔄 Atualizar
+                <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+                <span>Atualizar Lista</span>
               </button>
             </div>
           </div>
@@ -543,21 +535,11 @@ const AdminPanel: React.FC = () => {
                   <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => {
-                        setSelectedVideoForThumbnail(video);
-                        setShowThumbnailManager(true);
+                        setSelectedVideoForEdit(video);
+                        setShowVideoEditor(true);
                       }}
                       className="bg-gray-700/90 hover:bg-blue-600 p-2 rounded-full backdrop-blur-sm transition-colors"
-                      title="Gerenciar Thumbnail"
-                    >
-                      <Image size={16} className="text-white" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedVideo(video);
-                        // Implementar modal de edição
-                      }}
-                      className="bg-gray-700/90 hover:bg-gray-600 p-2 rounded-full backdrop-blur-sm transition-colors"
-                      title="Editar"
+                      title="Editar Vídeo"
                     >
                       <Edit size={16} className="text-white" />
                     </button>
@@ -673,42 +655,33 @@ const AdminPanel: React.FC = () => {
         onCancel={confirm.onCancel}
       />
 
-      {/* Thumbnail Manager */}
-      {selectedVideoForThumbnail && (
-        <ThumbnailManager
-          video={selectedVideoForThumbnail}
-          isOpen={showThumbnailManager}
+      {/* Video Editor */}
+      {selectedVideoForEdit && (
+        <VideoEditor
+          video={selectedVideoForEdit}
+          isOpen={showVideoEditor}
           onClose={() => {
-            setShowThumbnailManager(false);
-            setSelectedVideoForThumbnail(null);
+            setShowVideoEditor(false);
+            setSelectedVideoForEdit(null);
           }}
-          onThumbnailUpdated={() => {
-            console.log('🔄 Thumbnail atualizada, recarregando lista de vídeos...');
+          onVideoUpdated={(updatedVideo) => {
+            console.log('🔄 Vídeo atualizado, atualizando lista...');
             
-            // Recarrega a lista completa imediatamente para pegar o thumbnailFileName atualizado
-            loadVideos();
+            // Atualiza o vídeo na lista local
+            setVideos(prevVideos => 
+              prevVideos.map(v => 
+                v.videoId === updatedVideo.videoId ? updatedVideo : v
+              )
+            );
             
-            // Força atualização visual com cache busting
-            const timestamp = Date.now();
+            // Força recarregamento completo para pegar mudanças de thumbnail
             setTimeout(() => {
-              setVideos(prevVideos => 
-                prevVideos.map(v => {
-                  if (v.videoId === selectedVideoForThumbnail?.videoId) {
-                    // Adiciona cache busting à URL existente
-                    const currentUrl = v.thumbnailUrl || '';
-                    const separator = currentUrl.includes('?') ? '&' : '?';
-                    return { 
-                      ...v, 
-                      thumbnailUrl: `${currentUrl}${separator}cb=${timestamp}`
-                    };
-                  }
-                  return v;
-                })
-              );
+              loadVideos();
             }, 1000);
           }}
         />
       )}
+
     </div>
   );
 };

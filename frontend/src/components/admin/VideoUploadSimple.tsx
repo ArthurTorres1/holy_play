@@ -14,8 +14,34 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<'form' | 'uploading' | 'success' | 'error'>('form');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Função para upload de thumbnail com retry e delay
+  const uploadThumbnailWithRetry = async (videoId: string, thumbFile: File, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Aguardar antes de cada tentativa (mais tempo na primeira)
+        const delay = attempt === 1 ? 5000 : 2000 * attempt;
+        console.log(`📸 Tentativa ${attempt}/${maxRetries} - Aguardando ${delay}ms antes de enviar thumbnail...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        console.log(`📸 Enviando thumbnail (tentativa ${attempt}/${maxRetries})...`);
+        await bunnyStreamService.uploadThumbnail(videoId, thumbFile);
+        
+        console.log(`✅ Thumbnail enviada com sucesso na tentativa ${attempt}`);
+        return; // Sucesso, sair da função
+        
+      } catch (err) {
+        console.warn(`⚠️ Falha na tentativa ${attempt}/${maxRetries}:`, err);
+        
+        if (attempt === maxRetries) {
+          console.error('❌ Todas as tentativas de upload de thumbnail falharam:', err);
+        }
+      }
+    }
+  };
 
   // Thumbnail opcional
   const [thumbFile, setThumbFile] = useState<File | null>(null);
@@ -118,13 +144,15 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
         }
       }
 
-      // Passo 3 (opcional): Enviar thumbnail simples (sem crop)
+      // Passo 3: Upload de thumbnail assíncrono (não bloqueia o processo)
       if (thumbFile) {
-        try {
-          await bunnyStreamService.uploadThumbnail(videoId, thumbFile);
-        } catch (err) {
-          console.warn('Falha ao enviar thumbnail, seguindo sem ela:', err);
-        }
+        console.log('📸 Iniciando upload de thumbnail em background...');
+        // Fazer upload da thumbnail em background com retry
+        uploadThumbnailWithRetry(videoId, thumbFile).then(() => {
+          console.log('🎉 Upload de thumbnail concluído com sucesso!');
+        }).catch((err) => {
+          console.error('❌ Upload de thumbnail falhou definitivamente:', err);
+        });
       }
 
       setStep('success');
@@ -139,12 +167,23 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto shadow-2xl border border-gray-700">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-2xl font-bold text-white">Upload de Vídeo</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <div className="flex items-center justify-between p-8 border-b border-gray-700/50">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-600/20 rounded-xl">
+              <Upload className="text-red-400" size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Adicionar Novo Vídeo</h2>
+              <p className="text-gray-400 text-sm">Faça upload e configure seu conteúdo</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-all duration-200 p-2 hover:bg-gray-700/50 rounded-lg"
+          >
             <X size={24} />
           </button>
         </div>
@@ -153,10 +192,17 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Área de Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Arquivo de Vídeo *</label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                  <Upload size={16} />
+                  Arquivo de Vídeo *
+                </label>
                 <div
-                  className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-gray-500 transition-colors cursor-pointer"
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer ${
+                    file 
+                      ? 'border-green-500/50 bg-green-500/5' 
+                      : 'border-gray-600 hover:border-red-500/50 hover:bg-red-500/5'
+                  }`}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onClick={() => fileInputRef.current?.click()}
@@ -170,20 +216,43 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                   />
 
                   {file ? (
-                    <div className="space-y-2">
-                      <CheckCircle className="mx-auto text-green-400" size={48} />
-                      <p className="text-white font-medium">{file.name}</p>
-                      <p className="text-gray-400">{formatFileSize(file.size)}</p>
-                      <p className="text-sm text-gray-500">Clique para alterar o arquivo</p>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-green-500/20 rounded-full w-fit mx-auto">
+                        <CheckCircle className="text-green-400" size={32} />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-lg">{file.name}</p>
+                        <p className="text-green-400 font-medium">{formatFileSize(file.size)}</p>
+                        <p className="text-sm text-gray-400 mt-2">✓ Arquivo selecionado com sucesso</p>
+                        <button 
+                          type="button"
+                          className="mt-3 text-sm text-red-400 hover:text-red-300 underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFile(null);
+                            setTitle('');
+                          }}
+                        >
+                          Remover arquivo
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <Upload className="mx-auto text-gray-400" size={48} />
-                      <p className="text-white">Arraste e solte seu vídeo aqui</p>
-                      <p className="text-gray-400">ou clique para selecionar</p>
-                      <p className="text-sm text-gray-500">
-                        Formatos suportados: MP4, MOV, M4V, AVI, WMV, FLV, WebM, 3GP, 3G2, MKV
-                      </p>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-700/50 rounded-full w-fit mx-auto">
+                        <Upload className="text-gray-400" size={32} />
+                      </div>
+                      <div>
+                        <p className="text-white text-lg font-medium mb-2">Arraste seu vídeo aqui</p>
+                        <p className="text-gray-400 mb-4">ou clique para selecionar do seu computador</p>
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
+                          <Upload size={14} />
+                          Selecionar Arquivo
+                        </div>
+                        <p className="text-xs text-gray-500 mt-4 max-w-md mx-auto">
+                          Formatos aceitos: MP4, MOV, M4V, AVI, WMV, FLV, WebM, 3GP, 3G2, MKV
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -226,73 +295,140 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
               </div>
 
               {/* Título */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Título *</label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  Título do Vídeo *
+                </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Digite o título do vídeo"
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-red-500/50 focus:bg-gray-800 transition-all duration-200"
+                  placeholder="Ex: Minha Pregação Especial"
                   required
                 />
+                <p className="text-xs text-gray-500">Este será o nome exibido na plataforma</p>
               </div>
 
               {/* Descrição */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                  <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                  Descrição (Opcional)
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Digite uma descrição para o vídeo (opcional)"
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-red-500/50 focus:bg-gray-800 transition-all duration-200 resize-none"
+                  placeholder="Descreva o conteúdo do seu vídeo, temas abordados, versículos citados..."
                 />
+                <p className="text-xs text-gray-500">Ajuda os usuários a entenderem o conteúdo do vídeo</p>
               </div>
 
               {/* Ações */}
-              <div className="flex gap-4">
-                <button type="button" onClick={onClose} className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+              <div className="flex gap-4 pt-4 border-t border-gray-700/50">
+                <button 
+                  type="button" 
+                  onClick={onClose} 
+                  className="flex-1 px-6 py-3 bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl transition-all duration-200 font-medium border border-gray-600/50 hover:border-gray-500"
+                >
                   Cancelar
                 </button>
-                <button type="submit" disabled={!file || !title.trim() || uploading} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors">
-                  Fazer Upload
+                <button 
+                  type="submit" 
+                  disabled={!file || !title.trim() || uploading} 
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white rounded-xl transition-all duration-200 font-semibold shadow-lg disabled:shadow-none flex items-center justify-center gap-2"
+                >
+                  <Upload size={18} />
+                  {uploading ? 'Enviando...' : 'Fazer Upload'}
                 </button>
               </div>
             </form>
           )}
 
           {step === 'uploading' && (
-            <div className="text-center space-y-6">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto"></div>
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2">Fazendo Upload...</h3>
-                <p className="text-gray-400 mb-4">Por favor, não feche esta janela</p>
-                <p className="text-sm text-gray-400">Enviando arquivo para o Bunny.net...</p>
+            <div className="text-center space-y-8 py-8">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-20 w-20 border-4 border-red-500/20 border-t-red-500 mx-auto"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Upload className="text-red-400" size={24} />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-white">Enviando seu vídeo</h3>
+                <div className="space-y-2">
+                  <p className="text-gray-300">Por favor, mantenha esta janela aberta</p>
+                  <p className="text-sm text-gray-400">Processando e enviando para a plataforma...</p>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2 max-w-xs mx-auto">
+                  <div className="bg-gradient-to-r from-red-500 to-red-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+                </div>
               </div>
             </div>
           )}
 
           {step === 'success' && (
-            <div className="text-center space-y-6">
-              <CheckCircle className="mx-auto text-green-400" size={64} />
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2">Upload Concluído!</h3>
-                <p className="text-gray-400">Seu vídeo foi enviado com sucesso e está sendo processado.</p>
-                <p className="text-sm text-gray-500 mt-2">O processamento pode levar alguns minutos dependendo do tamanho do arquivo.</p>
+            <div className="text-center space-y-8 py-8">
+              <div className="relative">
+                <div className="p-6 bg-green-500/20 rounded-full w-fit mx-auto">
+                  <CheckCircle className="text-green-400" size={48} />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">✓</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-white">Upload Concluído!</h3>
+                <div className="space-y-2">
+                  <p className="text-green-400 font-medium">Seu vídeo foi enviado com sucesso</p>
+                  <p className="text-gray-400">O processamento será feito automaticamente</p>
+                  <p className="text-sm text-gray-500">Pode levar alguns minutos para aparecer na biblioteca</p>
+                </div>
+                <div className="pt-4">
+                  <button 
+                    onClick={onSuccess}
+                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg"
+                  >
+                    Continuar
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {step === 'error' && (
-            <div className="text-center space-y-6">
-              <AlertCircle className="mx-auto text-red-400" size={64} />
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2">Erro no Upload</h3>
-                <p className="text-gray-400 mb-4">{error}</p>
-                <div className="flex gap-4">
-                  <button onClick={onClose} className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">Fechar</button>
-                  <button onClick={() => setStep('form')} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">Tentar Novamente</button>
+            <div className="text-center space-y-8 py-8">
+              <div className="relative">
+                <div className="p-6 bg-red-500/20 rounded-full w-fit mx-auto">
+                  <AlertCircle className="text-red-400" size={48} />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">!</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-white">Ops! Algo deu errado</h3>
+                <div className="space-y-2">
+                  <p className="text-red-400 font-medium">Não foi possível fazer o upload</p>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 max-w-md mx-auto">
+                    <p className="text-gray-300 text-sm">{error}</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 justify-center pt-4">
+                  <button 
+                    onClick={onClose} 
+                    className="px-6 py-3 bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl transition-all duration-200 font-medium border border-gray-600/50"
+                  >
+                    Fechar
+                  </button>
+                  <button 
+                    onClick={() => setStep('form')} 
+                    className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg"
+                  >
+                    Tentar Novamente
+                  </button>
                 </div>
               </div>
             </div>
