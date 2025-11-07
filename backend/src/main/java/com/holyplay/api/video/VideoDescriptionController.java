@@ -25,7 +25,7 @@ public class VideoDescriptionController {
         this.createOrUpdate = createOrUpdate;
         this.getByVideoId = getByVideoId;
     }
-
+    
     @PostMapping("/{videoId}/description")
     public ResponseEntity<VideoDescriptionResponse> upsert(
             @PathVariable @NotBlank @Size(max = 128) String videoId,

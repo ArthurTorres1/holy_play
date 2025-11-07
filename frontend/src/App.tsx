@@ -3,15 +3,16 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
+import IndividualSection from './components/home/IndividualSection';
 import Categories from './components/Categories';
 import PlatformHighlights from './components/PlatformHighlights';
 import Benefits from './components/Benefits';
-import PopularContent from './components/PopularContent';
 import PricingPlan from './components/PricingPlan';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import AdminPanel from './components/admin/AdminPanel';
 import AuthPage from './pages/AuthPage';
+import VideoPlayer from './pages/VideoPlayer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Componente da página principal
@@ -19,10 +20,12 @@ const HomePage: React.FC = () => (
   <div className="bg-black min-h-screen">
     <Header />
     <Hero />
+    <IndividualSection sectionId="new" />
     <Categories />
+    <IndividualSection sectionId="popular" />
     <PlatformHighlights />
+    <IndividualSection sectionId="featured" />
     <Benefits />
-    <PopularContent />
     <PricingPlan />
     <FAQ />
     <Footer />
@@ -37,6 +40,10 @@ const router = createBrowserRouter([
   {
     path: "/auth",
     element: <AuthPage />
+  },
+  {
+    path: "/video/:videoId",
+    element: <VideoPlayer />
   },
   {
     path: "/admin",

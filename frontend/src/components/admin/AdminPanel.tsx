@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Play, Trash2, Edit, Plus, RefreshCw } from 'lucide-react';
+import { Upload, Play, Trash2, Edit, Plus, RefreshCw, Home } from 'lucide-react';
 import bunnyStreamService, { Video } from '../../services/bunnyStreamApi';
 import VideoUploadSimple from './VideoUploadSimple';
 import VideoPlayerSimple from './VideoPlayerSimple';
 import VideoEditor from './VideoEditor';
+import HomeVideosManager from './HomeVideosManager';
 import Alert from '../common/Alert';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { useAlert } from '../../hooks/useAlert';
@@ -44,15 +45,10 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
     setPrefs(getThumbPrefs(video.videoId));
   }, [video.thumbnailUrl, video.videoId]);
 
-  // Sempre renderiza imagem estática (sem iframe) para manter visual limpo como no painel
-  
   // Lista de URLs de thumbnail priorizadas pelo serviço (usa fileName quando disponível)
   const thumbnailUrls = bunnyStreamService
     .getPreferredThumbnailUrlsFromVideo(video)
     .map((url) => (url.includes('?') ? `${url}&cb=${forceRefresh}` : `${url}?cb=${forceRefresh}`));
-
-  console.log(`🔍 URLs de thumbnail para ${video.videoId}:`, thumbnailUrls);
-  
 
   // Fallback simples para quando não há thumbnail disponível
   if ((hasError && !apiThumbUrl) || thumbnailUrls.length === 0) {
@@ -73,11 +69,6 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
     );
   }
 
-  // TESTE: Usar uma imagem simples para debug
-  if (thumbnailUrls.length === 0) {
-    console.log(`⚠️ Nenhuma URL de thumbnail disponível para ${video.videoId}`);
-  }
-
   const objectFitClass = 'object-cover';
   const objectPosition = `${Math.max(0, Math.min(100, prefs.posX))}% ${Math.max(0, Math.min(100, prefs.posY))}%`;
 
@@ -90,9 +81,7 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
           alt={`Thumbnail ${video.title}`}
           className={`w-full h-full ${objectFitClass}`}
           style={{ objectPosition }}
-          onLoad={() => console.log(`✅ Thumbnail via API (blob) carregada para ${video.videoId}`)}
           onError={() => {
-            console.log(`❌ Falha ao carregar blob de thumbnail para ${video.videoId}`);
             setHasError(true);
           }}
         />
@@ -104,15 +93,9 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
           className={`w-full h-full ${objectFitClass}`}
           style={{ objectPosition }}
           onError={() => {
-            console.log(`❌ Erro ao carregar thumbnail ${currentThumbnailIndex + 1}/${thumbnailUrls.length} para ${video.videoId}:`, {
-              failedUrl: thumbnailUrls[currentThumbnailIndex],
-              nextUrl: thumbnailUrls[currentThumbnailIndex + 1] || 'Nenhuma'
-            });
-            
             if (currentThumbnailIndex < thumbnailUrls.length - 1) {
               setCurrentThumbnailIndex(prev => prev + 1);
             } else {
-              console.log(`❌ Todas as ${thumbnailUrls.length} URLs falharam para ${video.videoId}. Tentando fallback via API (blob)...`);
               // Tenta carregar via API (blob)
               bunnyStreamService.getThumbnailObjectUrl(video.videoId, 640)
                 .then((url) => {
@@ -127,7 +110,6 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
             }
           }}
           onLoad={() => {
-            console.log(`✅ Thumbnail carregada com sucesso para ${video.videoId}:`, thumbnailUrls[currentThumbnailIndex]);
             setHasError(false);
           }}
         />
@@ -144,6 +126,7 @@ const ThumbnailCell: React.FC<{ video: Video }> = ({ video }) => {
 };
 
 const AdminPanel: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'videos' | 'home'>('videos');
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
@@ -151,7 +134,6 @@ const AdminPanel: React.FC = () => {
   const [showPlayer, setShowPlayer] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<Video | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
   const { alert, showSuccess, showError, hideAlert } = useAlert();
   const { confirm, showConfirm } = useConfirm();
 
@@ -159,152 +141,11 @@ const AdminPanel: React.FC = () => {
     loadVideos();
   }, []);
 
-  // Busca a descrição salva no backend por videoId
-  const getBackendDescription = async (videoId: string): Promise<string | null> => {
-    try {
-      const { buildApiUrl } = await import('../../config/api');
-      const resp = await fetch(buildApiUrl(`api/videos/${videoId}/description`));
-      if (!resp.ok) {
-        if (resp.status === 304) return null;
-        return null;
-      }
-      const ct = resp.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const data = await resp.json();
-        if (data && typeof data.description === 'string') return data.description;
-        // Caso o backend envie direto a string dentro do JSON
-        if (typeof data === 'string') return data || null;
-        return null;
-      } else {
-        const text = (await resp.text()).trim();
-        return text.length > 0 ? text : null;
-      }
-    } catch (e) {
-      return null;
-    }
-  };
-
-  // Função para verificar se há vídeos em processamento
-  const hasProcessingVideos = (videoList: Video[]): boolean => {
-    return videoList.some(video => {
-      const realStatus = getRealVideoStatus(video);
-      return realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
-    });
-  };
-
-  // Função para atualizar apenas os vídeos em processamento
-  const updateProcessingVideos = async () => {
-    if (isPolling) return; // Evita polling simultâneo
-    
-    setIsPolling(true);
-    try {
-      const processingVideos = videos.filter(video => {
-        const realStatus = getRealVideoStatus(video);
-        return realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
-      });
-
-      if (processingVideos.length === 0) {
-        setIsPolling(false);
-        return;
-      }
-
-      console.log(`🔄 Verificando status de ${processingVideos.length} vídeos em processamento...`);
-
-      // Atualiza apenas os vídeos em processamento
-      const updatedVideos = await Promise.all(
-        processingVideos.map(async (video) => {
-          try {
-            const detail = await bunnyStreamService.getVideo(video.videoId);
-            const updatedVideo = {
-              ...video,
-              status: detail.status ?? video.status,
-              availableResolutions: detail.availableResolutions || video.availableResolutions,
-              thumbnailUrl: detail.thumbnailUrl || video.thumbnailUrl,
-            };
-
-            // Verifica se o vídeo ficou pronto
-            const oldStatus = getRealVideoStatus(video);
-            const newStatus = getRealVideoStatus(updatedVideo);
-            
-            if (oldStatus.status !== 3 && newStatus.status === 3) {
-              console.log(`✅ Vídeo "${video.title}" ficou pronto!`);
-              showSuccess('Vídeo Pronto!', `"${video.title}" foi processado com sucesso.`);
-            }
-
-            return updatedVideo;
-          } catch (error) {
-            console.log(`❌ Erro ao verificar status do vídeo ${video.videoId}:`, error);
-            return video; // Mantém o vídeo original se der erro
-          }
-        })
-      );
-
-      // Atualiza a lista de vídeos
-      setVideos(prevVideos => {
-        const videoMap = new Map(updatedVideos.map(v => [v.videoId, v]));
-        return prevVideos.map(v => videoMap.get(v.videoId) || v);
-      });
-
-    } catch (error) {
-      console.error('Erro no polling de vídeos:', error);
-    } finally {
-      setIsPolling(false);
-    }
-  };
-
-  // Effect para polling automático
-  useEffect(() => {
-    if (!videos.length) return;
-
-    const shouldPoll = hasProcessingVideos(videos);
-    if (!shouldPoll) return;
-
-    console.log('🎬 Iniciando polling automático para vídeos em processamento...');
-
-    const interval = setInterval(() => {
-      updateProcessingVideos();
-    }, 5000); // Verifica a cada 5 segundos
-
-    return () => {
-      console.log('⏹️ Parando polling automático');
-      clearInterval(interval);
-    };
-  }, [videos, isPolling]);
-
   const loadVideos = async () => {
     try {
       setLoading(true);
       const response = await bunnyStreamService.getVideos();
-      
-
-      // Enriquecer SEMPRE com detalhes (garante thumbnailUrl correto e status/resoluções atualizados)
-      const enriched = await Promise.all(
-        response.items.map(async (v) => {
-          try {
-            const detail = await bunnyStreamService.getVideo(v.videoId);
-            // Busca descrição do backend e prioriza sobre a da Bunny
-            const backendDesc = await getBackendDescription(v.videoId);
-            return {
-              ...v,
-              title: detail.title || v.title,
-              description: backendDesc ?? detail.description ?? v.description,
-              thumbnailUrl: detail.thumbnailUrl || v.thumbnailUrl,
-              availableResolutions: detail.availableResolutions || v.availableResolutions,
-              status: detail.status ?? v.status,
-              length: detail.length ?? v.length,
-              width: detail.width ?? v.width,
-              height: detail.height ?? v.height,
-              views: detail.views ?? v.views,
-              storageSize: detail.storageSize ?? v.storageSize,
-              dateUploaded: detail.dateUploaded || v.dateUploaded,
-            } as Video;
-          } catch (error) {
-            return v;
-          }
-        })
-      );
-
-      setVideos(enriched);
+      setVideos(response.items);
     } catch (error) {
       console.error('Erro ao carregar vídeos:', error);
       showError('Erro ao carregar vídeos', 'Verifique suas credenciais da API.');
@@ -324,14 +165,7 @@ const AdminPanel: React.FC = () => {
           showSuccess('Vídeo deletado!', 'O vídeo foi removido com sucesso.');
         } catch (error: any) {
           console.error('Erro ao deletar vídeo:', error);
-          
-          // Se for erro 404, remove da lista local (vídeo fantasma)
-          if (error.response?.status === 404) {
-            setVideos(videos.filter(video => video.videoId !== videoId));
-            showSuccess('Vídeo removido', 'Vídeo fantasma removido da lista (não existia mais na API).');
-          } else {
-            showError('Erro ao deletar', 'Não foi possível deletar o vídeo.');
-          }
+          showError('Erro ao deletar', 'Não foi possível deletar o vídeo.');
         }
       },
       {
@@ -342,44 +176,18 @@ const AdminPanel: React.FC = () => {
     );
   };
 
-  const formatFileSize = (bytes: number): string => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  // Função para determinar o status real baseado em múltiplos fatores
   const getRealVideoStatus = (video: Video) => {
     const hasResolutions = !!(video.availableResolutions && video.availableResolutions.trim().length > 0);
 
-    // Regra principal: só é PRONTO se já houver resoluções disponíveis
     if (hasResolutions) {
       return { status: 3, text: 'Pronto', color: 'text-green-500', bgColor: 'bg-green-500/90' };
     }
 
-    // Sem resoluções ainda: tratar como processando, mesmo que a API já reporte 3
-    if (video.status === 3) {
-      // Após upload, a API pode marcar 3 antes das resoluções
-      return { status: 4, text: 'Criando Resoluções', color: 'text-purple-500', bgColor: 'bg-purple-500/90' };
-    }
-
-    // Se status é 2 (falha) mas muito recente, considerar ainda processando
-    if (video.status === 2) {
-      const uploadTime = new Date(video.dateUploaded).getTime();
-      const now = new Date().getTime();
-      const timeDiff = now - uploadTime;
-      const thirtyMinutes = 30 * 60 * 1000;
-      if (timeDiff < thirtyMinutes) {
-        return { status: 1, text: 'Processando Vídeo', color: 'text-blue-500', bgColor: 'bg-blue-500/90' };
-      }
-      return { status: 2, text: 'Falha no Processamento', color: 'text-red-500', bgColor: 'bg-red-500/90' };
-    }
-
-    // Demais status sem resoluções
     switch (video.status) {
       case 0: return { status: 0, text: 'Aguardando Upload', color: 'text-gray-500', bgColor: 'bg-gray-500/90' };
       case 1: return { status: 1, text: 'Processando Vídeo', color: 'text-blue-500', bgColor: 'bg-blue-500/90' };
+      case 2: return { status: 2, text: 'Falha no Processamento', color: 'text-red-500', bgColor: 'bg-red-500/90' };
+      case 3: return { status: 4, text: 'Criando Resoluções', color: 'text-purple-500', bgColor: 'bg-purple-500/90' };
       case 4: return { status: 4, text: 'Criando Resoluções', color: 'text-purple-500', bgColor: 'bg-purple-500/90' };
       default: return { status: video.status, text: 'Status Desconhecido', color: 'text-gray-500', bgColor: 'bg-gray-500/90' };
     }
@@ -396,6 +204,12 @@ const AdminPanel: React.FC = () => {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatFileSize = (bytes: number): string => {
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  };
 
   if (loading) {
     return (
@@ -424,7 +238,7 @@ const AdminPanel: React.FC = () => {
       {/* Header Moderno */}
       <div className="relative z-10 container mx-auto px-6 py-8">
         <div className="bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6 mb-6">
             <div className="text-center lg:text-left">
               <h1 className="text-5xl font-bold bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent mb-2">
                 HOLYPLAY
@@ -433,168 +247,197 @@ const AdminPanel: React.FC = () => {
               <p className="text-gray-500 text-sm mt-1">Gerencie seus vídeos e configure sua biblioteca</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={() => setShowUpload(true)}
-                className="group bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-semibold shadow-lg hover:shadow-red-500/25 transform hover:scale-105"
-              >
-                <div className="p-1 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
-                  <Plus size={20} />
-                </div>
-                <span>Adicionar Vídeo</span>
-              </button>
-              <button
-                onClick={loadVideos}
-                disabled={loading}
-                className="group bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-6 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-medium border border-gray-600/50 hover:border-gray-500"
-              >
-                <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
-                <span>Atualizar Lista</span>
-              </button>
-            </div>
+            {activeTab === 'videos' && (
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="group bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-semibold shadow-lg hover:shadow-red-500/25 transform hover:scale-105"
+                >
+                  <div className="p-1 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
+                    <Plus size={20} />
+                  </div>
+                  <span>Adicionar Vídeo</span>
+                </button>
+                <button
+                  onClick={loadVideos}
+                  disabled={loading}
+                  className="group bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-6 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-medium border border-gray-600/50 hover:border-gray-500"
+                >
+                  <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+                  <span>Atualizar Lista</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Tabs Navigation */}
+          <div className="flex space-x-1 bg-gray-800/50 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('videos')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-md font-semibold transition-all ${
+                activeTab === 'videos'
+                  ? 'bg-red-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <Upload className="w-5 h-5" />
+              <span>Gerenciar Vídeos</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-md font-semibold transition-all ${
+                activeTab === 'home'
+                  ? 'bg-red-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              <Home className="w-5 h-5" />
+              <span>Configurar Home</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="relative z-10 container mx-auto px-6 mb-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold mb-2 text-gray-300">Total de Vídeos</h3>
-            <p className="text-3xl font-bold text-red-400">{videos.length}</p>
-          </div>
-          <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold mb-2 text-gray-300">Vídeos Prontos</h3>
-            <p className="text-3xl font-bold text-red-400">
-              {videos.filter(v => getRealVideoStatus(v).status === 3).length}
-            </p>
-          </div>
-          <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold mb-2 text-gray-300">Processando</h3>
-            <p className="text-3xl font-bold text-red-400">
-              {videos.filter(v => {
-                const realStatus = getRealVideoStatus(v);
-                return realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
-              }).length}
-            </p>
-          </div>
-          <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold mb-2 text-gray-300">Total de Views</h3>
-            <p className="text-3xl font-bold text-red-400">
-              {videos.reduce((sum, v) => sum + v.views, 0).toLocaleString()}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Videos Grid */}
+      {/* Conteúdo baseado na tab ativa */}
       <div className="relative z-10 container mx-auto px-6 pb-16">
-        <h2 className="text-3xl font-bold mb-8 text-center">Biblioteca de Conteúdo</h2>
-        
-        {videos.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {videos.map((video) => (
-              <div key={video.videoId} className="group relative bg-black/40 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-red-500/50 transition-all duration-300 hover:scale-105">
-                {/* Thumbnail */}
-                <div className="relative aspect-video">
-                  <ThumbnailCell video={video} />
-                  
-                  {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    {(() => {
-                      const realStatus = getRealVideoStatus(video);
-                      const isProcessing = realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
-                      return (
-                        <div className="flex items-center gap-2">
-                          <span className={`text-white text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${realStatus.bgColor} ${isProcessing ? 'animate-pulse' : ''}`}>
-                            {realStatus.text}
-                          </span>
-                          {isProcessing && (
-                            <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Botão de Play Central */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                    <button
-                      onClick={() => {
-                        setSelectedVideo(video);
-                        setShowPlayer(true);
-                      }}
-                      className="bg-red-600/90 hover:bg-red-700 p-4 rounded-full backdrop-blur-sm transition-all transform hover:scale-110"
-                      title={getRealVideoStatus(video).status === 3 ? 'Assistir' : 'Assistir (ainda processando)'}
-                    >
-                      <Play size={24} className="text-white" fill="white" />
-                    </button>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => {
-                        setSelectedVideoForEdit(video);
-                        setShowVideoEditor(true);
-                      }}
-                      className="bg-gray-700/90 hover:bg-blue-600 p-2 rounded-full backdrop-blur-sm transition-colors"
-                      title="Editar Vídeo"
-                    >
-                      <Edit size={16} className="text-white" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteVideo(video.videoId)}
-                      className="bg-gray-700/90 hover:bg-red-600 p-2 rounded-full backdrop-blur-sm transition-colors"
-                      title="Deletar"
-                    >
-                      <Trash2 size={16} className="text-white" />
-                    </button>
-                  </div>
+        {activeTab === 'videos' && (
+          <>
+            {/* Stats Section */}
+            <div className="mb-12">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-300">Total de Vídeos</h3>
+                  <p className="text-3xl font-bold text-red-400">{videos.length}</p>
                 </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  <h3 className="font-bold text-lg mb-2 text-white truncate">{video.title}</h3>
-                  {video.description && (
-                    <details className="mb-3">
-                      <summary className="text-sm text-gray-300 cursor-pointer select-none">Ver descrição</summary>
-                      <div className="mt-2 text-gray-400 text-sm whitespace-pre-wrap">
-                        {video.description}
-                      </div>
-                    </details>
-                  )}
-                  
-                  {/* Stats */}
-                  <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-                    <span>{formatDuration(video.length)}</span>
-                    <span>{video.width || 0}x{video.height || 0}</span>
-                    <span>{formatFileSize(video.storageSize || 0)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>{video.views.toLocaleString()} views</span>
-                    <span>{new Date(video.dateUploaded).toLocaleDateString('pt-BR')}</span>
-                  </div>
+                <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-300">Vídeos Prontos</h3>
+                  <p className="text-3xl font-bold text-red-400">
+                    {videos.filter(v => getRealVideoStatus(v).status === 3).length}
+                  </p>
+                </div>
+                <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-300">Processando</h3>
+                  <p className="text-3xl font-bold text-red-400">
+                    {videos.filter(v => {
+                      const realStatus = getRealVideoStatus(v);
+                      return realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
+                    }).length}
+                  </p>
+                </div>
+                <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold mb-2 text-gray-300">Total de Views</h3>
+                  <p className="text-3xl font-bold text-red-400">
+                    {videos.reduce((sum, v) => sum + v.views, 0).toLocaleString()}
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <div className="bg-black/40 backdrop-blur-sm border border-gray-800 rounded-xl p-12 max-w-md mx-auto">
-              <Upload size={64} className="mx-auto text-gray-500 mb-6" />
-              <h3 className="text-2xl font-bold mb-4 text-white">Nenhum vídeo encontrado</h3>
-              <p className="text-gray-400 mb-8">Comece fazendo upload do seu primeiro vídeo</p>
-              <button
-                onClick={() => setShowUpload(true)}
-                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-105"
-              >
-                <Plus size={20} className="inline mr-2" />
-                Fazer Upload
-              </button>
             </div>
-          </div>
+
+            {/* Videos Grid */}
+            <div>
+              <h2 className="text-3xl font-bold mb-8 text-center">Biblioteca de Conteúdo</h2>
+              
+              {videos.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {videos.map((video) => (
+                    <div key={video.videoId} className="group relative bg-black/40 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-red-500/50 transition-all duration-300 hover:scale-105">
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video">
+                        <ThumbnailCell video={video} />
+                        
+                        {/* Status Badge */}
+                        <div className="absolute top-3 left-3">
+                          {(() => {
+                            const realStatus = getRealVideoStatus(video);
+                            const isProcessing = realStatus.status === 1 || realStatus.status === 4 || realStatus.status === 0;
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className={`text-white text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm ${realStatus.bgColor} ${isProcessing ? 'animate-pulse' : ''}`}>
+                                  {realStatus.text}
+                                </span>
+                                {isProcessing && (
+                                  <div className="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Botão de Play Central */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                          <button
+                            onClick={() => {
+                              setSelectedVideo(video);
+                              setShowPlayer(true);
+                            }}
+                            className="bg-red-600/90 hover:bg-red-700 p-4 rounded-full backdrop-blur-sm transition-all transform hover:scale-110"
+                          >
+                            <Play size={24} className="text-white" fill="white" />
+                          </button>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setSelectedVideoForEdit(video);
+                              setShowVideoEditor(true);
+                            }}
+                            className="bg-gray-700/90 hover:bg-blue-600 p-2 rounded-full backdrop-blur-sm transition-colors"
+                          >
+                            <Edit size={16} className="text-white" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVideo(video.videoId)}
+                            className="bg-gray-700/90 hover:bg-red-600 p-2 rounded-full backdrop-blur-sm transition-colors"
+                          >
+                            <Trash2 size={16} className="text-white" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-4">
+                        <h3 className="font-bold text-lg mb-2 text-white truncate">{video.title}</h3>
+                        
+                        {/* Stats */}
+                        <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
+                          <span>{formatDuration(video.length)}</span>
+                          <span>{video.width || 0}x{video.height || 0}</span>
+                          <span>{formatFileSize(video.storageSize || 0)}</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-center text-xs text-gray-500">
+                          <span>{video.views.toLocaleString()} views</span>
+                          <span>{new Date(video.dateUploaded).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="bg-black/40 backdrop-blur-sm border border-gray-800 rounded-xl p-12 max-w-md mx-auto">
+                    <Upload size={64} className="mx-auto text-gray-500 mb-6" />
+                    <h3 className="text-2xl font-bold mb-4 text-white">Nenhum vídeo encontrado</h3>
+                    <p className="text-gray-400 mb-8">Comece fazendo upload do seu primeiro vídeo</p>
+                    <button
+                      onClick={() => setShowUpload(true)}
+                      className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-105"
+                    >
+                      <Plus size={20} className="inline mr-2" />
+                      Fazer Upload
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tab Configurar Home */}
+        {activeTab === 'home' && (
+          <HomeVideosManager />
         )}
       </div>
 
@@ -611,13 +454,12 @@ const AdminPanel: React.FC = () => {
 
       {showPlayer && selectedVideo && (
         <VideoPlayerSimple
-          video={selectedVideo!}
+          video={selectedVideo}
           onClose={() => {
             setShowPlayer(false);
             setSelectedVideo(null);
           }}
           onStatusChange={(videoId, newStatus, newResolutions) => {
-            // Atualiza o vídeo na lista local
             setVideos(prevVideos => 
               prevVideos.map(v => 
                 v.videoId === videoId 
@@ -625,11 +467,28 @@ const AdminPanel: React.FC = () => {
                   : v
               )
             );
-            
-            // Se o vídeo ficou pronto, mostra notificação
-            if (newStatus === 3 || (newResolutions && newResolutions.trim().length > 0)) {
-              console.log(`✅ Vídeo ${videoId} ficou pronto!`);
-            }
+          }}
+        />
+      )}
+
+      {/* Video Editor */}
+      {selectedVideoForEdit && (
+        <VideoEditor
+          video={selectedVideoForEdit}
+          isOpen={showVideoEditor}
+          onClose={() => {
+            setShowVideoEditor(false);
+            setSelectedVideoForEdit(null);
+          }}
+          onVideoUpdated={(updatedVideo) => {
+            setVideos(prevVideos => 
+              prevVideos.map(v => 
+                v.videoId === updatedVideo.videoId ? updatedVideo : v
+              )
+            );
+            setTimeout(() => {
+              loadVideos();
+            }, 1000);
           }}
         />
       )}
@@ -654,34 +513,6 @@ const AdminPanel: React.FC = () => {
         onConfirm={confirm.onConfirm}
         onCancel={confirm.onCancel}
       />
-
-      {/* Video Editor */}
-      {selectedVideoForEdit && (
-        <VideoEditor
-          video={selectedVideoForEdit}
-          isOpen={showVideoEditor}
-          onClose={() => {
-            setShowVideoEditor(false);
-            setSelectedVideoForEdit(null);
-          }}
-          onVideoUpdated={(updatedVideo) => {
-            console.log('🔄 Vídeo atualizado, atualizando lista...');
-            
-            // Atualiza o vídeo na lista local
-            setVideos(prevVideos => 
-              prevVideos.map(v => 
-                v.videoId === updatedVideo.videoId ? updatedVideo : v
-              )
-            );
-            
-            // Força recarregamento completo para pegar mudanças de thumbnail
-            setTimeout(() => {
-              loadVideos();
-            }, 1000);
-          }}
-        />
-      )}
-
     </div>
   );
 };
