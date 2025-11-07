@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Categories from './components/Categories';
@@ -10,6 +11,8 @@ import PricingPlan from './components/PricingPlan';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import AdminPanel from './components/admin/AdminPanel';
+import AuthPage from './pages/AuthPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Componente da página principal
 const HomePage: React.FC = () => (
@@ -32,8 +35,16 @@ const router = createBrowserRouter([
     element: <HomePage />
   },
   {
+    path: "/auth",
+    element: <AuthPage />
+  },
+  {
     path: "/admin",
-    element: <AdminPanel />
+    element: (
+      <ProtectedRoute requiredRole="ADMIN">
+        <AdminPanel />
+      </ProtectedRoute>
+    )
   },
   {
     path: "*",
@@ -42,7 +53,11 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }
 
 export default App;
