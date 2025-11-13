@@ -1,5 +1,5 @@
 // API para gerenciar configurações da home
-const API_BASE_URL = 'http://localhost:7695/api/home/configurations';
+import { apiFetch } from '../utils/api';
 
 export interface HomeConfigurationResponse {
   sectionId: string;
@@ -23,7 +23,7 @@ class HomeConfigApi {
    */
   async getAllConfigurations(): Promise<HomeConfigurationResponse[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}`, {
+      const response = await apiFetch('api/home/configurations', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ class HomeConfigApi {
    */
   async getConfiguration(sectionId: string): Promise<HomeConfigurationResponse | null> {
     try {
-      const response = await fetch(`${API_BASE_URL}/${sectionId}`, {
+      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ class HomeConfigApi {
       
       console.log('🔐 Enviando requisição com token:', token.substring(0, 20) + '...');
       
-      const response = await fetch(`${API_BASE_URL}`, {
+      const response = await apiFetch('api/home/configurations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +112,7 @@ class HomeConfigApi {
         throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
       }
       
-      const response = await fetch(`${API_BASE_URL}/${sectionId}`, {
+      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ class HomeConfigApi {
         throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
       }
       
-      const response = await fetch(`${API_BASE_URL}/${sectionId}`, {
+      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -170,7 +170,7 @@ class HomeConfigApi {
         throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
       }
       
-      const response = await fetch(`${API_BASE_URL}/initialize`, {
+      const response = await apiFetch('api/home/configurations/initialize', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

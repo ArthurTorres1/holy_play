@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:7695/api';
+import { apiFetch } from '../utils/api';
 
 export interface LoginRequest {
   email: string;
@@ -37,7 +37,7 @@ class ApiService {
   }
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await apiFetch('api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ class ApiService {
   }
 
   async register(userData: RegisterRequest): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    const response = await apiFetch('api/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ class ApiService {
   }
 
   async getUsers(): Promise<User[]> {
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    const response = await apiFetch('api/users', {
       headers: this.getAuthHeaders(),
     });
 
@@ -82,7 +82,7 @@ class ApiService {
   }
 
   async getUser(id: number): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+    const response = await apiFetch(`api/users/${id}`, {
       headers: this.getAuthHeaders(),
     });
 

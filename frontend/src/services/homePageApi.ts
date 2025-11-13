@@ -1,5 +1,5 @@
 // API para buscar dados da página inicial
-const API_BASE_URL = 'http://localhost:7695/api/home/configurations';
+import { apiFetch } from '../utils/api';
 
 export interface HomeVideo {
   videoId: string;
@@ -30,7 +30,7 @@ export const getHomePageData = async (): Promise<HomePageData> => {
   try {
     console.log('🏠 Buscando dados da página inicial...');
     
-    const response = await fetch(`${API_BASE_URL}/home-page`, {
+    const response = await apiFetch('api/home/configurations/home-page', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
