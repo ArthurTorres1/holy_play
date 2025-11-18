@@ -1,5 +1,5 @@
 // API para gerenciar configurações da home
-import { apiFetch } from '../utils/api';
+import { http } from '../utils/api';
 
 export interface HomeConfigurationResponse {
   sectionId: string;
@@ -23,18 +23,7 @@ class HomeConfigApi {
    */
   async getAllConfigurations(): Promise<HomeConfigurationResponse[]> {
     try {
-      const response = await apiFetch('api/home/configurations', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar configurações: ${response.status}`);
-      }
-
-      return await response.json();
+      return await http.get('api/home/configurations');
     } catch (error) {
       console.error('Erro ao buscar configurações da home:', error);
       throw error;
@@ -46,22 +35,7 @@ class HomeConfigApi {
    */
   async getConfiguration(sectionId: string): Promise<HomeConfigurationResponse | null> {
     try {
-      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar configuração: ${response.status}`);
-      }
-
-      return await response.json();
+      return await http.get(`api/home/configurations/${sectionId}`);
     } catch (error) {
       console.error(`Erro ao buscar configuração da seção ${sectionId}:`, error);
       throw error;
@@ -73,28 +47,7 @@ class HomeConfigApi {
    */
   async saveConfiguration(config: HomeConfigurationRequest): Promise<HomeConfigurationResponse> {
     try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
-      }
-      
-      console.log('🔐 Enviando requisição com token:', token.substring(0, 20) + '...');
-      
-      const response = await apiFetch('api/home/configurations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(config),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao salvar configuração: ${response.status}`);
-      }
-
-      return await response.json();
+      return await http.post('api/home/configurations', { body: config, auth: true });
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
       throw error;
@@ -106,26 +59,7 @@ class HomeConfigApi {
    */
   async updateConfiguration(sectionId: string, config: HomeConfigurationRequest): Promise<HomeConfigurationResponse> {
     try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
-      }
-      
-      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(config),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao atualizar configuração: ${response.status}`);
-      }
-
-      return await response.json();
+      return await http.put(`api/home/configurations/${sectionId}`, { body: config, auth: true });
     } catch (error) {
       console.error(`Erro ao atualizar configuração da seção ${sectionId}:`, error);
       throw error;
@@ -137,22 +71,7 @@ class HomeConfigApi {
    */
   async deleteConfiguration(sectionId: string): Promise<void> {
     try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
-      }
-      
-      const response = await apiFetch(`api/home/configurations/${sectionId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao deletar configuração: ${response.status}`);
-      }
+      await http.delete(`api/home/configurations/${sectionId}`, { auth: true });
     } catch (error) {
       console.error(`Erro ao deletar configuração da seção ${sectionId}:`, error);
       throw error;
@@ -164,24 +83,7 @@ class HomeConfigApi {
    */
   async initializeDefaults(): Promise<string> {
     try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado. Faça login como administrador.');
-      }
-      
-      const response = await apiFetch('api/home/configurations/initialize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao inicializar configurações: ${response.status}`);
-      }
-
-      return await response.text();
+      return await http.post('api/home/configurations/initialize', { auth: true });
     } catch (error) {
       console.error('Erro ao inicializar configurações padrão:', error);
       throw error;

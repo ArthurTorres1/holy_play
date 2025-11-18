@@ -104,7 +104,10 @@ const Hero = () => {
   }
 
   return (
-    <section id="inicio" className="relative h-screen overflow-hidden">
+    <section
+      id="inicio"
+      className="relative min-h-[70vh] sm:min-h-[80vh] md:h-screen overflow-hidden"
+    >
       {heroVideos.map((video: HomeVideo, index: number) => (
         <div
           key={video.videoId}
@@ -112,7 +115,7 @@ const Hero = () => {
             index === currentSlide ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-transparent z-10" />
           <img
             src={video.thumbnailUrl}
             alt={video.title}
@@ -123,22 +126,22 @@ const Hero = () => {
               target.src = '/01.png';
             }}
           />
-          <div className="absolute inset-0 flex items-center z-20">
-            <div className="max-w-7xl mx-auto px-6 w-full">
-              <div className="max-w-2xl">
-                <h1 className="text-3xl md:text-5xl font-bold text-white mb-8 leading-tight">
+          <div className="absolute inset-0 flex items-end md:items-center z-20 pb-16 sm:pb-20 md:pb-0">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
+              <div className="max-w-xl sm:max-w-2xl rounded-lg md:rounded-none p-1.5 sm:p-3 md:p-0">
+                <h1 className="text-base sm:text-3xl md:text-5xl font-bold text-white mb-1 sm:mb-4 md:mb-6 leading-tight line-clamp-3">
                   {video.title}
                 </h1>
-                <div className="flex space-x-4">
+                <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-3 mt-1.5 sm:mt-4 md:mt-6">
                   <button 
                     onClick={() => handleWatchNow(video)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-lg flex items-center space-x-2 transition-colors text-lg font-semibold"
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-5 md:px-7 py-1.5 sm:py-2.5 md:py-3.5 rounded-lg flex items-center justify-center space-x-1.5 sm:space-x-2 transition-colors text-[11px] sm:text-sm md:text-base font-semibold"
                   >
-                    <Play className="h-6 w-6" />
+                    <Play className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                     <span>Assistir Agora</span>
                   </button>
-                  <button className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 rounded-lg flex items-center space-x-2 transition-colors text-lg font-semibold">
-                    <Info className="h-6 w-6" />
+                  <button className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-5 md:px-7 py-1.5 sm:py-2.5 md:py-3.5 rounded-lg flex items-center justify-center space-x-1.5 sm:space-x-2 transition-colors text-[11px] sm:text-sm md:text-base font-semibold">
+                    <Info className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                     <span>Mais Informações</span>
                   </button>
                 </div>
@@ -150,19 +153,19 @@ const Hero = () => {
       
       <button
         onClick={prevSlide}
-        className="absolute left-6 md:top-1/2 md:transform md:-translate-y-1/2 bottom-32 md:bottom-auto z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+        className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
       
       <button
         onClick={nextSlide}
-        className="absolute right-6 md:top-1/2 md:transform md:-translate-y-1/2 bottom-32 md:bottom-auto z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+        className="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
       >
         <ChevronRight className="h-6 w-6" />
       </button>
 
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
+      <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
         {heroVideos.map((_, index: number) => (
           <button
             key={index}

@@ -126,14 +126,14 @@ const HomeSections: React.FC = () => {
   }
 
   return (
-    <div className="bg-black py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+    <div className="bg-black py-10 sm:py-12 lg:py-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Seções de vídeos (exceto hero) */}
-        {sectionsToShow.map((section) => (
-          <HomeSection key={section.sectionId} section={section} onVideoClick={handleVideoClick} />
-        ))}
-        
+        <div className="space-y-8 sm:space-y-10 lg:space-y-12">
+          {sectionsToShow.map((section) => (
+            <HomeSection key={section.sectionId} section={section} onVideoClick={handleVideoClick} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -151,12 +151,12 @@ const HomeSection: React.FC<HomeSectionProps> = ({ section, onVideoClick }) => {
   }
 
   return (
-    <div className="mb-12">
+    <div className="mb-8 sm:mb-10 lg:mb-12">
       {/* Título da seção */}
-      <h2 className="text-2xl font-bold text-white mb-6">{section.sectionName}</h2>
+      <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">{section.sectionName}</h2>
       
       {/* Grid de vídeos - Layout tipo YouTube Shorts */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4">
         {section.videos.map((video) => (
           <VideoCard key={video.videoId} video={video} onClick={() => onVideoClick(video)} />
         ))}
@@ -174,11 +174,11 @@ interface VideoCardProps {
 const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
   return (
     <div 
-      className="bg-gray-800 rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-300 hover:shadow-xl"
+      className="bg-gray-800 rounded-lg overflow-hidden cursor-pointer transform hover:scale-[1.03] md:hover:scale-105 transition-all duration-300 hover:shadow-xl"
       onClick={onClick}
     >
       {/* Thumbnail - Proporção mais equilibrada */}
-      <div className="relative aspect-[4/5] bg-gray-700">
+      <div className="relative aspect-[3/4] sm:aspect-[4/5] bg-gray-700">
         {isValidThumbnail(video.thumbnailUrl) ? (
           <img
             src={video.thumbnailUrl}

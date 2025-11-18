@@ -1,17 +1,77 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import bunnyStreamService, { Video } from '../services/bunnyStreamApi';
 
 const VideoPlayer: React.FC = () => {
   const { videoId } = useParams<{ videoId: string }>();
+
+  const [details, setDetails] = useState<Video | null>(null);
+  const [backendDescription, setBackendDescription] = useState<string | null>(null);
+  const [loadingMeta, setLoadingMeta] = useState<boolean>(false);
+
+  const playerUrl = useMemo(() => {
+    if (!videoId) return '';
+    return bunnyStreamService.getPlayerUrl(videoId);
+  }, [videoId]);
+
+  useEffect(() => {
+    if (!videoId) return;
+
+    let cancelled = false;
+    setLoadingMeta(true);
+
+    (async () => {
+      try {
+        // Buscar detalhes atualizados no Bunny (título, description, views, etc.)
+        const fresh = await bunnyStreamService.getVideo(videoId);
+        if (!cancelled) {
+          setDetails(fresh);
+        }
+      } catch {
+        if (!cancelled) {
+          setDetails(null);
+        }
+      }
+
+      // Buscar descrição do backend e priorizar na exibição (mesma ideia do VideoPlayerSimple)
+      try {
+        const { buildApiUrl } = await import('../config/api');
+        const resp = await fetch(buildApiUrl(`api/videos/${videoId}/description`));
+        if (resp.ok) {
+          const ct = resp.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            const data = await resp.json();
+            if (!cancelled) {
+              const value = typeof data?.description === 'string' ? data.description : (typeof data === 'string' ? data : null);
+              setBackendDescription(value);
+            }
+          } else {
+            const text = (await resp.text()).trim();
+            if (!cancelled) setBackendDescription(text.length > 0 ? text : null);
+          }
+        } else if (!cancelled) {
+          setBackendDescription(null);
+        }
+      } catch {
+        if (!cancelled) setBackendDescription(null);
+      } finally {
+        if (!cancelled) setLoadingMeta(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
 
   if (!videoId) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-400 text-xl mb-4">❌ ID do vídeo não encontrado</p>
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors inline-flex items-center space-x-2"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -24,11 +84,10 @@ const VideoPlayer: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link 
-            to="/" 
+      <div className="bg-gray-900 border-b border-gray-800 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4">
+          <Link
+            to="/"
             className="inline-flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -37,69 +96,56 @@ const VideoPlayer: React.FC = () => {
         </div>
       </div>
 
-      {/* Player Container */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Video Player */}
-        <div className="bg-gray-900 rounded-lg overflow-hidden mb-8">
-          <div className="aspect-video bg-gray-800 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-4 mx-auto">
-                <span className="text-white text-2xl">▶</span>
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="bg-gray-900 rounded-lg overflow-hidden mb-6 sm:mb-8 shadow-lg">
+          <div className="aspect-video bg-black">
+            {playerUrl ? (
+              <iframe
+                src={playerUrl}
+                className="w-full h-full"
+                frameBorder="0"
+                allowFullScreen
+                allow="autoplay; fullscreen; picture-in-picture"
+                title={`Player do vídeo ${videoId}`}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                Carregando player...
               </div>
-              <h2 className="text-white text-xl mb-2">Player em Desenvolvimento</h2>
-              <p className="text-gray-400 mb-4">ID do Vídeo: <code className="bg-gray-700 px-2 py-1 rounded">{videoId}</code></p>
-              <p className="text-sm text-gray-500">
-                Aqui será integrado o player do Bunny Stream ou outro player de vídeo
+            )}
+          </div>
+        </div>
+
+        <div className="bg-gray-900 rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">
+              {details?.title || `Vídeo ${videoId.substring(0, 8)}`}
+            </h1>
+            <div className="flex flex-wrap gap-2 items-center text-[11px] sm:text-xs text-gray-400 break-all">
+              <span className="text-gray-400">ID do Vídeo:</span>
+              <code className="bg-gray-800 px-2 py-1 rounded text-[11px] sm:text-xs text-gray-200 break-all">{videoId}</code>
+              {typeof details?.views === 'number' && details.views > 0 && (
+                <span className="ml-2">{details.views.toLocaleString('pt-BR')} visualizações</span>
+              )}
+            </div>
+          </div>
+
+          {(backendDescription || details?.description) && (
+            <div className="pt-2 border-t border-gray-800">
+              <h2 className="text-sm sm:text-base font-semibold text-white mb-1 sm:mb-2">
+                Descrição
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+                {backendDescription ?? details?.description}
               </p>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Video Info */}
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h1 className="text-2xl font-bold text-white mb-4">
-            Vídeo {videoId?.substring(0, 8)}
-          </h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Informações</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">ID do Vídeo:</span>
-                  <span className="text-white font-mono">{videoId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Status:</span>
-                  <span className="text-green-400">Disponível</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Formato:</span>
-                  <span className="text-white">MP4</span>
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Próximos Passos</h3>
-              <ul className="text-sm text-gray-400 space-y-1">
-                <li>• Integrar player do Bunny Stream</li>
-                <li>• Buscar metadados do vídeo</li>
-                <li>• Adicionar controles de qualidade</li>
-                <li>• Implementar legendas</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Development Info */}
-        <div className="mt-8 bg-blue-900/20 border border-blue-800 rounded-lg p-4">
-          <h3 className="text-blue-400 font-semibold mb-2">🔧 Modo Desenvolvimento</h3>
-          <p className="text-blue-300 text-sm">
-            Esta página será substituída pelo player real do Bunny Stream. 
-            Por enquanto, ela serve para testar a navegação entre home e player.
-          </p>
+          {loadingMeta && (
+            <p className="text-[11px] sm:text-xs text-gray-500">
+              Carregando informações do vídeo...
+            </p>
+          )}
         </div>
       </div>
     </div>
