@@ -2,15 +2,21 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+type AppRole = 'ADMIN' | 'USER' | 'ASSINANTE_ANUAL';
+
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'ADMIN' | 'USER';
+  /** Role única exigida (compatibilidade com uso atual) */
+  requiredRole?: AppRole;
+  /** Lista de roles permitidas (basta ter uma delas) */
+  allowedRoles?: AppRole[];
   redirectTo?: string;
 }
 
 const ProtectedRoute = ({ 
   children, 
   requiredRole = 'USER', 
+  allowedRoles,
   redirectTo = '/auth' 
 }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading } = useAuth();
@@ -32,8 +38,13 @@ const ProtectedRoute = ({
     return <Navigate to={redirectTo} replace />;
   }
 
-  // Verificar se tem a role necessária
-  if (requiredRole && user.role !== requiredRole) {
+  // Montar conjunto de roles aceitas com base em requiredRole/allowedRoles
+  const rolesAceitas: AppRole[] = allowedRoles && allowedRoles.length > 0
+    ? allowedRoles
+    : [requiredRole];
+
+  // Verificar se tem alguma das roles necessárias
+  if (!rolesAceitas.includes(user.role as AppRole)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="text-center max-w-md">

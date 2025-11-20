@@ -2,7 +2,8 @@ package com.holyplay.domain.user;
 
 public enum Role {
     ADMIN("ADMIN"),
-    USER("USER");
+    USER("USER"),
+    ASSINANTE_ANUAL("ASSINANTE_ANUAL");
 
     private final String value;
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import bunnyStreamService, { Video } from '../services/bunnyStreamApi';
+import { getFriendlyErrorMessage } from '../utils/errorMessages';
 
 const VideoPlayer: React.FC = () => {
   const { videoId } = useParams<{ videoId: string }>();
@@ -9,6 +10,7 @@ const VideoPlayer: React.FC = () => {
   const [details, setDetails] = useState<Video | null>(null);
   const [backendDescription, setBackendDescription] = useState<string | null>(null);
   const [loadingMeta, setLoadingMeta] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const playerUrl = useMemo(() => {
     if (!videoId) return '';
@@ -20,6 +22,7 @@ const VideoPlayer: React.FC = () => {
 
     let cancelled = false;
     setLoadingMeta(true);
+    setError(null);
 
     (async () => {
       try {
@@ -28,9 +31,10 @@ const VideoPlayer: React.FC = () => {
         if (!cancelled) {
           setDetails(fresh);
         }
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setDetails(null);
+          setError(prev => prev ?? getFriendlyErrorMessage(err, 'Não foi possível carregar as informações do vídeo.'));
         }
       }
 
@@ -53,8 +57,11 @@ const VideoPlayer: React.FC = () => {
         } else if (!cancelled) {
           setBackendDescription(null);
         }
-      } catch {
-        if (!cancelled) setBackendDescription(null);
+      } catch (err) {
+        if (!cancelled) {
+          setBackendDescription(null);
+          setError(prev => prev ?? getFriendlyErrorMessage(err, 'Não foi possível carregar a descrição do vídeo.'));
+        }
       } finally {
         if (!cancelled) setLoadingMeta(false);
       }
@@ -119,16 +126,20 @@ const VideoPlayer: React.FC = () => {
         <div className="bg-gray-900 rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">
-              {details?.title || `Vídeo ${videoId.substring(0, 8)}`}
+              {details?.title || `Vídeo`}
             </h1>
-            <div className="flex flex-wrap gap-2 items-center text-[11px] sm:text-xs text-gray-400 break-all">
-              <span className="text-gray-400">ID do Vídeo:</span>
-              <code className="bg-gray-800 px-2 py-1 rounded text-[11px] sm:text-xs text-gray-200 break-all">{videoId}</code>
-              {typeof details?.views === 'number' && details.views > 0 && (
-                <span className="ml-2">{details.views.toLocaleString('pt-BR')} visualizações</span>
-              )}
-            </div>
+            {typeof details?.views === 'number' && details.views > 0 && (
+              <p className="text-[11px] sm:text-xs text-gray-400">
+                {details.views.toLocaleString('pt-BR')} visualizações
+              </p>
+            )}
           </div>
+
+          {error && (
+            <div className="text-red-400 text-xs sm:text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+              {error}
+            </div>
+          )}
 
           {(backendDescription || details?.description) && (
             <div className="pt-2 border-t border-gray-800">

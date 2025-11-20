@@ -125,13 +125,11 @@ class BunnyStreamService {
     // 1) Se existir host CDN configurado, usar ele (recomendado pelo painel)
     if (BUNNY_CDN_HOST) {
       const cdnUrl = `https://${BUNNY_CDN_HOST}/${videoId}/thumbnail.jpg`;
-      console.log(`🖼️ Thumbnail (CDN configurado) para ${videoId}: ${cdnUrl}`);
       return cdnUrl;
     }
 
     // 2) Fallback: usar mediadelivery (thumbnail endpoint)
     const mdUrl = `https://iframe.mediadelivery.net/thumbnail/${BUNNY_LIBRARY_ID}/${videoId}?width=320`;
-    console.log(`🖼️ Thumbnail (fallback mediadelivery) para ${videoId}: ${mdUrl}`);
     return mdUrl;
   }
 
@@ -164,7 +162,6 @@ class BunnyStreamService {
       this.getMediadeliveryThumbnailUrl(videoId, 480),
     ];
     const filtered = urls.filter(Boolean) as string[];
-    console.log(`🔗 Candidatas de thumbnail (por videoId) para ${videoId}:`, filtered);
     return filtered;
   }
 
@@ -184,7 +181,6 @@ class BunnyStreamService {
     urls.push(this.getMediadeliveryThumbnailUrl(video.videoId, 480));
 
     const filtered = urls.filter(Boolean) as string[];
-    console.log(`🔗 Candidatas de thumbnail (por Video) para ${video.videoId}:`, filtered);
     return filtered;
   }
 
@@ -195,7 +191,6 @@ class BunnyStreamService {
       // Endpoint experimental: muitas contas permitem GET no mesmo caminho do POST de set thumbnail
       // Se a API suportar, este GET retornará a imagem já gerada
       const apiUrl = `${BUNNY_STREAM_API_BASE}/library/${BUNNY_LIBRARY_ID}/videos/${videoId}/thumbnail?width=${width}`;
-      console.log(`🧪 Tentando obter thumbnail via API (blob) para ${videoId}:`, apiUrl);
       const res = await fetch(apiUrl, {
         method: 'GET',
         headers: {
@@ -209,7 +204,6 @@ class BunnyStreamService {
       }
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
-      console.log(`✅ Thumbnail via API (blob) gerada para ${videoId}`);
       return objectUrl;
     } catch (err) {
       console.error(`❌ Erro ao obter thumbnail via API para ${videoId}:`, err);
@@ -232,18 +226,6 @@ class BunnyStreamService {
       }
       
       const data: RawVideoListResponse = await response.json();
-      
-      console.log(`📹 Carregados ${data.items.length} vídeos da página ${page}`);
-      
-      // Log detalhado dos dados brutos da API
-      data.items.forEach(item => {
-        console.log(`📋 Dados brutos do vídeo ${item.guid}:`, {
-          title: item.title,
-          thumbnailUrl: item.thumbnailUrl,
-          thumbnailFileName: item.thumbnailFileName,
-          status: item.status
-        });
-      });
       
       const videos = data.items.map(item => this.normalize(item));
       
@@ -428,20 +410,6 @@ class BunnyStreamService {
   async uploadThumbnail(videoId: string, thumbnailFile: File): Promise<void> {
     const url = `${BUNNY_STREAM_API_BASE}/library/${BUNNY_LIBRARY_ID}/videos/${videoId}/thumbnail`;
     
-    console.log(`📸 Fazendo upload de thumbnail...`, {
-      videoId,
-      fileName: thumbnailFile.name,
-      fileSize: thumbnailFile.size,
-      fileType: thumbnailFile.type,
-      url,
-      libraryId: BUNNY_LIBRARY_ID,
-      apiKey: BUNNY_API_KEY ? `${BUNNY_API_KEY.substring(0, 8)}...` : 'AUSENTE',
-      headers: {
-        'AccessKey': BUNNY_API_KEY ? `${BUNNY_API_KEY.substring(0, 8)}...` : 'AUSENTE',
-        'accept': 'application/json'
-      }
-    });
-    
     try {
       // Tentativa 1: POST RAW BINÁRIO com timeout reduzido
       const controller = new AbortController();
@@ -479,7 +447,6 @@ class BunnyStreamService {
 
       // Tentativa 3: se 401, usar Authorization Bearer
       if (response.status === 401) {
-        console.log('🔄 Tentando com Authorization Bearer...');
         const formData3 = new FormData();
         formData3.append('thumbnail', thumbnailFile, thumbnailFile.name);
         response = await fetch(url, {
@@ -492,27 +459,17 @@ class BunnyStreamService {
         });
       }
 
-      console.log(`📡 Resposta da API:`, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ Erro HTTP ${response.status}:`, errorText);
         throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
       }
 
-      const responseData = await response.text();
-      console.log(`✅ Thumbnail enviada com sucesso para ${videoId}:`, responseData);
-
     } catch (error: any) {
       console.error(`❌ Erro ao enviar thumbnail para ${videoId}:`, error);
       
       // Se for erro de CORS, tentar abordagem alternativa
       if (error.message.includes('CORS') || error.name === 'TypeError') {
-        console.log('🔄 Tentando abordagem alternativa com XMLHttpRequest...');
         return this.uploadThumbnailXHR(videoId, thumbnailFile);
       }
       
@@ -533,14 +490,7 @@ class BunnyStreamService {
       // Não definir Content-Type para FormData - deixar o browser definir automaticamente
       
       xhr.onload = () => {
-        console.log(`📡 XHR Resposta:`, {
-          status: xhr.status,
-          statusText: xhr.statusText,
-          responseText: xhr.responseText
-        });
-        
         if (xhr.status >= 200 && xhr.status < 300) {
-          console.log(`✅ Thumbnail enviada via XHR para ${videoId}`);
           resolve();
         } else {
           console.error(`❌ Erro XHR ${xhr.status}:`, xhr.responseText);
@@ -556,8 +506,7 @@ class BunnyStreamService {
       // Usar FormData para envio correto do arquivo
       const formData = new FormData();
       formData.append('file', thumbnailFile);
-      
-      console.log(`📡 Enviando via XHR para: ${url}`);
+
       xhr.send(formData);
     });
   }
@@ -565,14 +514,6 @@ class BunnyStreamService {
   // Definir thumbnail a partir de um momento específico do vídeo
   async setThumbnailFromVideo(videoId: string, timeInSeconds: number): Promise<void> {
     const url = `${BUNNY_STREAM_API_BASE}/library/${BUNNY_LIBRARY_ID}/videos/${videoId}/thumbnail?thumbnailTime=${timeInSeconds}`;
-    
-    console.log(`🎬 Iniciando definição de thumbnail...`, {
-      videoId,
-      timeInSeconds,
-      url,
-      libraryId: BUNNY_LIBRARY_ID,
-      apiKey: BUNNY_API_KEY ? 'Presente' : 'Ausente'
-    });
     
     try {
       // Usar XMLHttpRequest para melhor controle
@@ -584,19 +525,11 @@ class BunnyStreamService {
         xhr.setRequestHeader('Content-Type', 'application/json');
         
         xhr.onreadystatechange = () => {
-          console.log(`📡 XMLHttpRequest state: ${xhr.readyState}, status: ${xhr.status}`);
+          // noop
         };
         
         xhr.onload = () => {
-          console.log(`📡 Resposta recebida:`, {
-            status: xhr.status,
-            statusText: xhr.statusText,
-            responseText: xhr.responseText,
-            headers: xhr.getAllResponseHeaders()
-          });
-          
           if (xhr.status >= 200 && xhr.status < 300) {
-            console.log(`✅ Thumbnail definida com sucesso para ${videoId} no tempo ${timeInSeconds}s`);
             resolve();
           } else {
             console.error(`❌ Erro HTTP ${xhr.status}:`, xhr.responseText);
@@ -615,8 +548,7 @@ class BunnyStreamService {
         };
         
         xhr.timeout = 30000; // 30 segundos de timeout
-        
-        console.log(`📡 Enviando requisição POST para: ${url}`);
+
         xhr.send();
       });
       
@@ -639,13 +571,9 @@ class BunnyStreamService {
   // Deletar thumbnail personalizada (volta para thumbnail automática)
   async deleteThumbnail(videoId: string): Promise<void> {
     try {
-      console.log(`🗑️ Removendo thumbnail personalizada do vídeo ${videoId}...`);
-      
       const response = await bunnyApi.delete(
         `/library/${BUNNY_LIBRARY_ID}/videos/${videoId}/thumbnail`
       );
-
-      console.log(`✅ Thumbnail removida com sucesso para ${videoId}`);
       return response.data;
     } catch (error: any) {
       console.error(`❌ Erro ao remover thumbnail do vídeo ${videoId}:`, error);

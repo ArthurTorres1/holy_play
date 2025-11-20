@@ -87,7 +87,8 @@ const HomeVideosManager: React.FC = () => {
 
   const loadHomeConfigurations = async () => {
     try {
-      console.log('🏠 Carregando configurações da home...');
+      setLoading(true);
+      setError(null);
       const configurations = await homeConfigApi.getAllConfigurations();
       
       if (configurations.length > 0) {
@@ -109,10 +110,8 @@ const HomeVideosManager: React.FC = () => {
           }
           return section;
         }));
-        
-        console.log('🏠 Configurações carregadas:', configurations);
       } else {
-        console.log('🏠 Nenhuma configuração encontrada, usando padrões');
+        // Nenhuma configuração encontrada, usando padrões
       }
     } catch (error) {
       console.error('❌ Erro ao carregar configurações da home:', error);
@@ -123,16 +122,8 @@ const HomeVideosManager: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🎬 HomeVideosManager: Carregando vídeos...');
       
       const response = await bunnyStreamService.getVideos();
-      console.log('🎬 HomeVideosManager: Resposta da API:', response);
-      console.log('🎬 HomeVideosManager: Total de vídeos na API:', response.items.length);
-      
-      // Log dos status dos vídeos
-      response.items.forEach(video => {
-        console.log(`🎬 Vídeo "${video.title}": Status ${video.status}, Resoluções: "${video.availableResolutions}"`);
-      });
       
       // Converter vídeos da API para o formato HomeVideo
       // Por enquanto, vamos mostrar TODOS os vídeos para debug
@@ -149,9 +140,6 @@ const HomeVideosManager: React.FC = () => {
           isVisible: true
         }));
 
-      console.log('🎬 HomeVideosManager: Vídeos filtrados:', homeVideos.length);
-      console.log('🎬 HomeVideosManager: Vídeos disponíveis:', homeVideos);
-      
       setAvailableVideos(homeVideos);
     } catch (error: any) {
       console.error('❌ Erro ao carregar vídeos:', error);
@@ -262,7 +250,6 @@ const HomeVideosManager: React.FC = () => {
   const saveAllConfigurations = async () => {
     try {
       setLoading(true);
-      console.log('💾 Salvando configurações...');
 
       // Salvar cada seção
       for (const section of sections) {
@@ -273,11 +260,9 @@ const HomeVideosManager: React.FC = () => {
           maxVideos: section.maxVideos
         };
 
-        console.log(`💾 Salvando seção ${section.id}:`, configRequest);
         await homeConfigApi.saveConfiguration(configRequest);
       }
 
-      console.log('✅ Todas as configurações salvas com sucesso!');
       alert('Configurações salvas com sucesso!');
       
     } catch (error: any) {
@@ -292,11 +277,9 @@ const HomeVideosManager: React.FC = () => {
   const initializeDefaults = async () => {
     try {
       setLoading(true);
-      console.log('🚀 Inicializando configurações padrão...');
       
-      const result = await homeConfigApi.initializeDefaults();
-      console.log('✅ Configurações inicializadas:', result);
-      
+      await homeConfigApi.initializeDefaults();
+
       // Recarregar configurações após inicializar
       await loadHomeConfigurations();
       

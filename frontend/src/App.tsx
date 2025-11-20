@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import AdminPanel from './components/admin/AdminPanel';
 import AuthPage from './pages/AuthPage';
 import VideoPlayer from './pages/VideoPlayer';
+import CatalogPage from './pages/CatalogPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Componente da página principal
@@ -42,8 +43,20 @@ const router = createBrowserRouter([
     element: <AuthPage />
   },
   {
+    path: "/catalogo",
+    element: (
+      <ProtectedRoute allowedRoles={['ADMIN', 'ASSINANTE_ANUAL']}>
+        <CatalogPage />
+      </ProtectedRoute>
+    )
+  },
+  {
     path: "/video/:videoId",
-    element: <VideoPlayer />
+    element: (
+      <ProtectedRoute allowedRoles={['USER', 'ADMIN', 'ASSINANTE_ANUAL']}>
+        <VideoPlayer />
+      </ProtectedRoute>
+    )
   },
   {
     path: "/admin",
