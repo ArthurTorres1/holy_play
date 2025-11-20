@@ -113,8 +113,11 @@ const HomeVideosManager: React.FC = () => {
       } else {
         // Nenhuma configuração encontrada, usando padrões
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao carregar configurações da home:', error);
+      setError(`Erro ao carregar configurações da home: ${error?.message || 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
