@@ -1,11 +1,18 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import { X, Upload, CheckCircle, AlertCircle, Crosshair, Image as ImageIcon } from 'lucide-react';
 import bunnyStreamService from '../../services/bunnyStreamApi';
+import { apiFetch } from '../../utils/api';
 
 interface VideoUploadSimpleProps {
   onClose: () => void;
   onSuccess: () => void;
+}
+
+interface VideoCategory {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSuccess }) => {
@@ -16,6 +23,13 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const [step, setStep] = useState<'form' | 'uploading' | 'success' | 'error'>('form');
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Categorias
+  const [categories, setCategories] = useState<VideoCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   // Função para upload de thumbnail com retry e delay
   const uploadThumbnailWithRetry = async (videoId: string, thumbFile: File, maxRetries = 3) => {
@@ -47,6 +61,37 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const thumbPreviewUrl = useMemo(() => (thumbFile ? URL.createObjectURL(thumbFile) : ''), [thumbFile]);
+
+  // Carregar categorias ao abrir o modal
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCategories = async () => {
+      try {
+        setLoadingCategory(true);
+        const res = await apiFetch('/api/videos/categories');
+        if (!res.ok) {
+          throw new Error('Falha ao carregar categorias');
+        }
+        const data: VideoCategory[] = await res.json();
+        if (!cancelled) {
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar categorias:', err);
+      } finally {
+        if (!cancelled) {
+          setLoadingCategory(false);
+        }
+      }
+    };
+
+    loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -141,6 +186,25 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
           await axios.post(buildApiUrl(`api/videos/${videoId}/description`), { description: description.trim() });
         } catch (e) {
           console.warn('Falha ao salvar descrição no backend:', e);
+        }
+      }
+
+      // Passo 2.3: Salvar categoria (se selecionada)
+      if (selectedCategoryId !== null) {
+        try {
+          const resCat = await apiFetch(`/api/videos/${videoId}/category`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ categoryId: selectedCategoryId }),
+          });
+
+          if (!resCat.ok) {
+            console.warn('Falha ao salvar categoria do vídeo:', resCat.status);
+          }
+        } catch (err) {
+          console.warn('Erro ao salvar categoria do vídeo:', err);
         }
       }
 
@@ -325,6 +389,86 @@ const VideoUploadSimple: React.FC<VideoUploadSimpleProps> = ({ onClose, onSucces
                   placeholder="Descreva o conteúdo do seu vídeo, temas abordados, versículos citados..."
                 />
                 <p className="text-xs text-gray-500">Ajuda os usuários a entenderem o conteúdo do vídeo</p>
+              </div>
+
+              {/* Categoria (Opcional) */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Categoria (Opcional)
+                </label>
+                <div className="bg-gray-800/40 border border-gray-700/60 rounded-xl p-4 space-y-3">
+                  {loadingCategory ? (
+                    <p className="text-sm text-gray-400">Carregando categorias...</p>
+                  ) : categories.length === 0 ? (
+                    <p className="text-sm text-gray-400">Nenhuma categoria cadastrada ainda.</p>
+                  ) : (
+                    <select
+                      value={selectedCategoryId ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedCategoryId(value ? Number(value) : null);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-900/60 border border-gray-700/70 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/70 focus:bg-gray-900 transition-all duration-200"
+                    >
+                      <option value="">Selecione uma categoria</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="mt-2 space-y-2">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nova categoria (ex: Louvor, Estudos Bíblicos)"
+                      className="w-full px-3 py-2 bg-gray-900/60 border border-gray-700/70 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-green-500/70 focus:bg-gray-900 transition-all duration-200"
+                    />
+                    <button
+                      type="button"
+                      disabled={creatingCategory || !newCategoryName.trim()}
+                      onClick={async () => {
+                        const name = newCategoryName.trim();
+                        if (!name) return;
+                        try {
+                          setCreatingCategory(true);
+                          const res = await apiFetch('/api/videos/categories', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ name }),
+                          });
+
+                          if (!res.ok) {
+                            throw new Error('Não foi possível criar a categoria');
+                          }
+
+                          const created: VideoCategory = await res.json();
+                          setCategories((prev) => {
+                            const exists = prev.some((c) => c.id === created.id);
+                            if (exists) return prev;
+                            return [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
+                          });
+                          setSelectedCategoryId(created.id);
+                          setNewCategoryName('');
+                        } catch (err: any) {
+                          console.error('Erro ao criar categoria:', err);
+                          alert(err?.message || 'Não foi possível criar a categoria.');
+                        } finally {
+                          setCreatingCategory(false);
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 text-xs font-semibold text-white transition-all duration-200"
+                    >
+                      {creatingCategory ? 'Criando categoria...' : 'Criar nova categoria'}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Ações */}

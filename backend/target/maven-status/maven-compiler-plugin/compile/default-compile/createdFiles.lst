@@ -11,4 +11,5 @@ com\holyplay\application\video\GetVideoDescriptionUseCase.class
 com\holyplay\application\health\CheckDatabaseHealthUseCase.class
 com\holyplay\application\video\CreateOrUpdateVideoDescriptionUseCase.class
 com\holyplay\domain\video\VideoDescription.class
+com\holyplay\api\video\dto\CreateVideoCategoryRequest.class
 com\holyplay\api\video\dto\UpsertVideoDescriptionRequest.class

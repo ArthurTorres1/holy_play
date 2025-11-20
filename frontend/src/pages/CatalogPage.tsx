@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Play, Clock } from 'lucide-react';
+import { Search, Play, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import bunnyStreamService, { Video as BunnyVideo } from '../services/bunnyStreamApi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
+import { apiFetch } from '../utils/api';
 
 interface CatalogVideo {
   id: string;
@@ -12,6 +13,14 @@ interface CatalogVideo {
   description: string;
   thumbnail: string;
   duration: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
+}
+
+interface VideoCategory {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -24,11 +33,17 @@ const formatDuration = (seconds: number): string => {
   return `${minutes}min`;
 };
 
+const VIDEOS_PER_PAGE = 20;
+
 const CatalogPage: React.FC = () => {
-  const [videos, setVideos] = useState<CatalogVideo[]>([]);
+  const [allVideos, setAllVideos] = useState<CatalogVideo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [categories, setCategories] = useState<VideoCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,20 +52,53 @@ const CatalogPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const response = await bunnyStreamService.getVideos();
-        const mapped: CatalogVideo[] = response.items.map((video: BunnyVideo) => {
+        // Carregar vídeos da Bunny e categorias do backend em paralelo
+        const [bunnyResponse, videosWithCategoriesRes] = await Promise.all([
+          bunnyStreamService.getVideos(),
+          apiFetch('/api/videos/videos-with-categories')
+        ]);
+
+        // Criar mapa de categorias por videoId
+        const categoryMap = new Map<string, { categoryId: number | null; categoryName: string | null }>();
+        if (videosWithCategoriesRes.ok) {
+          const videosWithCategories = await videosWithCategoriesRes.json();
+          console.log('🔍 Vídeos com categorias do backend:', videosWithCategories.length);
+          videosWithCategories.forEach((item: any) => {
+            categoryMap.set(item.videoId, {
+              categoryId: item.categoryId,
+              categoryName: item.categoryName
+            });
+            if (item.categoryId) {
+              console.log(`📂 Vídeo ${item.videoId} tem categoria: ${item.categoryName} (ID: ${item.categoryId})`);
+            }
+          });
+        }
+
+        console.log('🎬 Vídeos da Bunny Stream:', bunnyResponse.items.length);
+
+        const mapped: CatalogVideo[] = bunnyResponse.items.map((video: BunnyVideo) => {
           const thumbs = bunnyStreamService.getPreferredThumbnailUrlsFromVideo(video);
           const thumbnail = thumbs[0] ?? '/api/placeholder/400/225';
-          return {
+          const categoryInfo = categoryMap.get(video.videoId);
+          
+          const result = {
             id: video.videoId,
             title: video.title,
             description: video.description || '',
             thumbnail,
             duration: formatDuration(video.length || 0),
+            categoryId: categoryInfo?.categoryId || null,
+            categoryName: categoryInfo?.categoryName || null,
           };
+          
+          if (categoryInfo?.categoryId) {
+            console.log(`✅ Mapeado vídeo ${video.videoId} (${video.title}) com categoria ${categoryInfo.categoryName}`);
+          }
+          
+          return result;
         });
 
-        setVideos(mapped);
+        setAllVideos(mapped);
       } catch (err: any) {
         setError(getFriendlyErrorMessage(err, 'Erro ao carregar vídeos. Tente novamente em instantes.'));
       } finally {
@@ -61,11 +109,81 @@ const CatalogPage: React.FC = () => {
     load();
   }, []);
 
+  // Carregar lista de categorias para o filtro
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const res = await apiFetch('/api/videos/categories');
+        if (!res.ok) {
+          return;
+        }
+        const data: VideoCategory[] = await res.json();
+        setCategories(data);
+      } catch {
+        // Erro em categorias não deve quebrar o catálogo; apenas não mostra o filtro
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  // Removido: agora as categorias já vêm junto com os vídeos no carregamento inicial
+
+  // Função para remover acentos
+  const removeAccents = (str: string): string => {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  };
+
+  // Filtrar vídeos por busca e categoria
   const filteredVideos = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return videos;
-    return videos.filter((v) => v.title.toLowerCase().includes(q));
-  }, [videos, query]);
+    const qWithoutAccents = removeAccents(q);
+    
+    const filtered = allVideos.filter((v: CatalogVideo) => {
+      const titleLower = v.title.toLowerCase();
+      const titleWithoutAccents = removeAccents(titleLower);
+      
+      // Busca com e sem acentos
+      const matchesQuery = !q || 
+        titleLower.includes(q) || 
+        titleWithoutAccents.includes(q) ||
+        titleLower.includes(qWithoutAccents) ||
+        titleWithoutAccents.includes(qWithoutAccents);
+        
+      const matchesCategory = !selectedCategoryId || v.categoryId === selectedCategoryId;
+      return matchesQuery && matchesCategory;
+    });
+    
+    if (selectedCategoryId) {
+      const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+      console.log(`🔍 Filtro ativo para categoria "${selectedCategory?.name}" (ID: ${selectedCategoryId})`);
+      console.log(`📊 Vídeos com essa categoria: ${filtered.length} de ${allVideos.length} total`);
+      
+      const videosWithSelectedCategory = allVideos.filter((v: CatalogVideo) => v.categoryId === selectedCategoryId);
+      console.log('🎯 Vídeos que deveriam aparecer:', videosWithSelectedCategory.map((v: CatalogVideo) => `${v.title} (${v.id})`));
+    }
+    
+    return filtered;
+  }, [allVideos, query, selectedCategoryId, categories]);
+
+  // Calcular paginação
+  const totalPages = Math.ceil(filteredVideos.length / VIDEOS_PER_PAGE);
+  const startIndex = (currentPage - 1) * VIDEOS_PER_PAGE;
+  const endIndex = startIndex + VIDEOS_PER_PAGE;
+  const currentVideos = filteredVideos.slice(startIndex, endIndex);
+
+  // Reset página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, selectedCategoryId]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleOpenVideo = (id: string) => {
     navigate(`/video/${id}`);
@@ -82,15 +200,39 @@ const CatalogPage: React.FC = () => {
             Explore todos os conteúdos disponíveis na HolyPlay. Use a busca para encontrar um vídeo pelo título.
           </p>
 
-          <div className="relative max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-900 border border-gray-700 text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all"
-              placeholder="Buscar por título..."
-            />
+          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-end">
+            <div className="relative flex-1 max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-900 border border-gray-700 text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all"
+                placeholder="Buscar por título..."
+              />
+            </div>
+
+            {categories.length > 0 && (
+              <div className="w-full md:w-64">
+                <label className="block text-xs text-gray-400 mb-1">Filtrar por categoria</label>
+                <select
+                  value={selectedCategoryId ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedCategoryId(value ? Number(value) : null);
+                  }}
+                  disabled={loadingCategories}
+                  className="w-full px-3 py-2.5 rounded-lg bg-gray-900 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all"
+                >
+                  <option value="">Todas as categorias</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </section>
 
@@ -114,8 +256,19 @@ const CatalogPage: React.FC = () => {
                 {query && <p className="text-sm">Tente buscar por outro título.</p>}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-                {filteredVideos.map((video) => (
+              <>
+                {/* Informações da paginação */}
+                <div className="flex justify-between items-center mb-6 text-sm text-gray-400">
+                  <p>
+                    Mostrando {startIndex + 1}-{Math.min(endIndex, filteredVideos.length)} de {filteredVideos.length} vídeos
+                    {query && ` para "${query}"`}
+                    {selectedCategoryId && ` na categoria "${categories.find(c => c.id === selectedCategoryId)?.name}"`}
+                  </p>
+                  <p>Página {currentPage} de {totalPages}</p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                  {currentVideos.map((video: CatalogVideo) => (
                   <button
                     key={video.id}
                     type="button"
@@ -143,15 +296,77 @@ const CatalogPage: React.FC = () => {
                       <h2 className="text-xs sm:text-sm font-semibold text-white mb-1 line-clamp-2">
                         {video.title}
                       </h2>
-                      {video.description && (
-                        <p className="text-[11px] text-gray-400 line-clamp-2">
-                          {video.description}
-                        </p>
+                      {(video.categoryName || video.description) && (
+                        <div className="space-y-0.5">
+                          {video.categoryName && (
+                            <p className="text-[11px] text-red-300 font-medium line-clamp-1">
+                              {video.categoryName}
+                            </p>
+                          )}
+                          {video.description && (
+                            <p className="text-[11px] text-gray-400 line-clamp-2">
+                              {video.description}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                {/* Controles de Paginação */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center mt-8 space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Anterior
+                    </button>
+
+                    <div className="flex space-x-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                              currentPage === pageNum
+                                ? 'text-white bg-red-600 border border-red-600'
+                                : 'text-gray-300 bg-gray-800 border border-gray-700 hover:bg-gray-700 hover:text-white'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Próxima
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

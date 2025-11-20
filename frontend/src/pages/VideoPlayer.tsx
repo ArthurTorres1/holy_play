@@ -9,6 +9,7 @@ const VideoPlayer: React.FC = () => {
 
   const [details, setDetails] = useState<Video | null>(null);
   const [backendDescription, setBackendDescription] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
   const [loadingMeta, setLoadingMeta] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,29 +39,51 @@ const VideoPlayer: React.FC = () => {
         }
       }
 
-      // Buscar descrição do backend e priorizar na exibição (mesma ideia do VideoPlayerSimple)
       try {
         const { buildApiUrl } = await import('../config/api');
-        const resp = await fetch(buildApiUrl(`api/videos/${videoId}/description`));
-        if (resp.ok) {
-          const ct = resp.headers.get('content-type') || '';
-          if (ct.includes('application/json')) {
-            const data = await resp.json();
-            if (!cancelled) {
-              const value = typeof data?.description === 'string' ? data.description : (typeof data === 'string' ? data : null);
-              setBackendDescription(value);
+
+        // Buscar descrição do backend (opcional). Se falhar ou retornar 404, apenas não exibe.
+        try {
+          const resp = await fetch(buildApiUrl(`api/videos/${videoId}/description`));
+          if (resp.ok) {
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const data = await resp.json();
+              if (!cancelled) {
+                const value = typeof data?.description === 'string' ? data.description : (typeof data === 'string' ? data : null);
+                setBackendDescription(value);
+              }
+            } else {
+              const text = (await resp.text()).trim();
+              if (!cancelled) setBackendDescription(text.length > 0 ? text : null);
             }
-          } else {
-            const text = (await resp.text()).trim();
-            if (!cancelled) setBackendDescription(text.length > 0 ? text : null);
+          } else if (!cancelled) {
+            // 404 ou outro status: considerar sem descrição
+            setBackendDescription(null);
           }
-        } else if (!cancelled) {
-          setBackendDescription(null);
+        } catch {
+          if (!cancelled) {
+            // Erro ao buscar descrição não deve aparecer como erro de tela, apenas não exibe
+            setBackendDescription(null);
+          }
         }
-      } catch (err) {
-        if (!cancelled) {
-          setBackendDescription(null);
-          setError(prev => prev ?? getFriendlyErrorMessage(err, 'Não foi possível carregar a descrição do vídeo.'));
+
+        // Buscar categoria do vídeo (opcional). Se falhar ou retornar 404, apenas não exibe.
+        try {
+          const respCat = await fetch(buildApiUrl(`api/videos/${videoId}/category`));
+          if (respCat.ok) {
+            const data = await respCat.json();
+            const name = typeof data?.categoryName === 'string' ? data.categoryName : null;
+            if (!cancelled) {
+              setCategoryName(name);
+            }
+          } else if (!cancelled) {
+            setCategoryName(null);
+          }
+        } catch {
+          if (!cancelled) {
+            setCategoryName(null);
+          }
         }
       } finally {
         if (!cancelled) setLoadingMeta(false);
@@ -141,14 +164,22 @@ const VideoPlayer: React.FC = () => {
             </div>
           )}
 
-          {(backendDescription || details?.description) && (
+          {(backendDescription || details?.description || categoryName) && (
             <div className="pt-2 border-t border-gray-800">
               <h2 className="text-sm sm:text-base font-semibold text-white mb-1 sm:mb-2">
                 Descrição
               </h2>
-              <p className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
-                {backendDescription ?? details?.description}
-              </p>
+              {categoryName && (
+                <p className="text-[11px] sm:text-xs text-gray-400 mb-1">
+                  Categoria:{' '}
+                  <span className="font-semibold text-gray-200">{categoryName}</span>
+                </p>
+              )}
+              {(backendDescription || details?.description) && (
+                <p className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+                  {backendDescription ?? details?.description}
+                </p>
+              )}
             </div>
           )}
 

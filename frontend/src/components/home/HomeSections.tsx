@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Play, Eye } from 'lucide-react';
 import { getHomePageData, formatDuration, formatViews, getVideoPlayerUrl, isValidThumbnail } from '../../services/homePageApi';
 import type { HomePageData, HomeSection, HomeVideo } from '../../services/homePageApi';
-import bunnyStreamService from '../../services/bunnyStreamApi';
 
 const HomeSections: React.FC = () => {
   const [homeData, setHomeData] = useState<HomePageData | null>(null);
@@ -19,52 +18,35 @@ const HomeSections: React.FC = () => {
       setError(null);
       
       const data = await getHomePageData();
-      
-      // Buscar dados reais da Bunny Stream para cada vídeo em cada seção
-      const sectionsWithRealData = await Promise.all(
-        data.sections.map(async (section) => {
-          if (section.videos && section.videos.length > 0) {
-            const videosWithThumbnails = await Promise.all(
-              section.videos.map(async (video) => {
-                try {
-                  // Buscar dados completos do vídeo na Bunny Stream
-                  const bunnyVideo = await bunnyStreamService.getVideo(video.videoId);
-                  
-                  // Usar a mesma lógica de thumbnail do Hero
-                  const thumbnailUrl = bunnyVideo.thumbnailUrl || 
-                                     bunnyStreamService.getThumbnailUrlFromVideo(bunnyVideo, 480) ||
-                                     bunnyStreamService.getThumbnailUrl(video.videoId, 480);
-                  
-                  console.log(`🖼️ Thumbnail para ${video.videoId}:`, thumbnailUrl);
-                  
-                  return {
-                    ...video,
-                    title: bunnyVideo.title || video.title,
-                    description: bunnyVideo.description || video.description,
-                    thumbnailUrl: thumbnailUrl,
-                    duration: bunnyVideo.length || video.duration,
-                    views: bunnyVideo.views || video.views
-                  };
-                } catch (error) {
-                  console.warn(`⚠️ Erro ao buscar dados da Bunny para ${video.videoId}:`, error);
-                  // Usar dados do backend como fallback
-                  return video;
-                }
-              })
-            );
-            
-            return {
-              ...section,
-              videos: videosWithThumbnails
-            };
-          }
+
+      // Otimização: não chamar a Bunny para cada vídeo.
+      // Usar diretamente os dados que já vêm do backend (título, descrição, duration, thumbnailUrl).
+      // Apenas garantimos que exista uma thumbnail válida ou um placeholder.
+      const sectionsOptimized = data.sections.map((section) => {
+        if (!section.videos || section.videos.length === 0) {
           return section;
-        })
-      );
-      
+        }
+
+        const videosWithSafeThumbnail: HomeVideo[] = section.videos.map((video) => {
+          const safeThumb = isValidThumbnail(video.thumbnailUrl)
+            ? video.thumbnailUrl
+            : '/api/placeholder/400/225';
+
+          return {
+            ...video,
+            thumbnailUrl: safeThumb,
+          };
+        });
+
+        return {
+          ...section,
+          videos: videosWithSafeThumbnail,
+        };
+      });
+
       setHomeData({
         ...data,
-        sections: sectionsWithRealData
+        sections: sectionsOptimized,
       });
       
     } catch (error: any) {

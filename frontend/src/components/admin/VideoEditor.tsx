@@ -11,6 +11,19 @@ interface VideoEditorProps {
   onVideoUpdated: (updatedVideo: Video) => void;
 }
 
+interface VideoCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+interface VideoCategoryAssignmentResponse {
+  videoId: string;
+  categoryId: number;
+  categoryName: string;
+  categorySlug: string;
+}
+
 const VideoEditor: React.FC<VideoEditorProps> = ({
   video,
   isOpen,
@@ -26,6 +39,13 @@ const VideoEditor: React.FC<VideoEditorProps> = ({
   const [title, setTitle] = useState(video.title);
   const [description, setDescription] = useState(video.description || '');
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Categorias
+  const [categories, setCategories] = useState<VideoCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   // Estados para thumbnail
   type ThumbPrefs = {
@@ -95,12 +115,73 @@ const VideoEditor: React.FC<VideoEditorProps> = ({
     clearImageSelection();
   }, [video.videoId]);
 
+  // Carregar categorias e categoria atual do vídeo quando o modal abrir ou o vídeo mudar
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setLoadingCategory(true);
+
+        // 1) Carregar lista de categorias
+        if (categories.length === 0) {
+          const res = await apiFetch('/api/videos/categories');
+          if (!res.ok) {
+            throw new Error('Falha ao carregar categorias');
+          }
+          const data: VideoCategory[] = await res.json();
+          if (!cancelled) {
+            setCategories(data);
+          }
+        }
+
+        // 2) Carregar categoria atual do vídeo
+        try {
+          const resCat = await apiFetch(`/api/videos/${video.videoId}/category`);
+          if (resCat.ok) {
+            const data: VideoCategoryAssignmentResponse = await resCat.json();
+            if (!cancelled) {
+              setSelectedCategoryId(data.categoryId);
+            }
+          } else if (resCat.status === 404) {
+            if (!cancelled) {
+              setSelectedCategoryId(null);
+            }
+          }
+        } catch (err) {
+          // Se der erro ao pegar categoria, não bloqueia o editor
+          if (!cancelled) {
+            setSelectedCategoryId(null);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Erro ao carregar categorias:', err);
+          showError('Erro ao carregar categorias', 'Tente recarregar a página ou abrir o vídeo novamente.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCategory(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, video.videoId]);
+
   if (!isOpen) return null;
 
 
   // Salvar tudo de uma vez (metadados + thumbnail)
   const handleSaveAll = async () => {
-    if (!hasChanges && !selectedFile) return;
+    if (!hasChanges && !selectedFile && selectedCategoryId === null) return;
 
     setUploading(true);
     setSaving(true);
@@ -129,6 +210,26 @@ const VideoEditor: React.FC<VideoEditorProps> = ({
         });
         
         console.log('✅ Resposta da descrição:', descResponse.status, await descResponse.text());
+      }
+
+      // 1.2. Salvar categoria se selecionada (ou remover se estiver null)
+      if (selectedCategoryId !== null) {
+        try {
+          const resCat = await apiFetch(`/api/videos/${video.videoId}/category`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ categoryId: selectedCategoryId }),
+          });
+
+          if (!resCat.ok) {
+            throw new Error('Falha ao salvar categoria do vídeo');
+          }
+        } catch (err: any) {
+          console.error('Erro ao salvar categoria:', err);
+          showError('Erro ao salvar categoria', err?.message || 'Não foi possível salvar a categoria do vídeo.');
+        }
       }
 
       // 2. Aplicar thumbnail se houver imagem selecionada
@@ -373,7 +474,7 @@ const VideoEditor: React.FC<VideoEditorProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {(hasChanges || selectedFile) && (
+            {(hasChanges || selectedFile || selectedCategoryId !== null) && (
               <button
                 onClick={handleSaveAll}
                 disabled={saving || uploading}
@@ -442,6 +543,93 @@ const VideoEditor: React.FC<VideoEditorProps> = ({
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-purple-500/50 focus:bg-gray-800 transition-all duration-200 resize-none"
                     placeholder="Descreva o conteúdo, temas abordados, versículos citados..."
                   />
+                </div>
+              </div>
+
+              {/* Categoria */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-600/20 rounded-lg">
+                    <Type className="text-green-400" size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-semibold text-white">Categoria</h4>
+                    <p className="text-gray-400 text-sm">Classifique o vídeo para organização na plataforma</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
+                  {loadingCategory ? (
+                    <p className="text-sm text-gray-400">Carregando categorias...</p>
+                  ) : categories.length === 0 ? (
+                    <p className="text-sm text-yellow-400">Nenhuma categoria cadastrada no sistema.</p>
+                  ) : (
+                    <select
+                      value={selectedCategoryId ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedCategoryId(value ? Number(value) : null);
+                      }}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500/50 focus:bg-gray-800 transition-all duration-200"
+                    >
+                      <option value="">Selecione uma categoria</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nova categoria (ex: Louvor, Estudos Bíblicos)"
+                      className="w-full px-4 py-2 bg-gray-900/60 border border-gray-700/70 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500/70 focus:bg-gray-900 transition-all duration-200"
+                    />
+                    <button
+                      type="button"
+                      disabled={creatingCategory || !newCategoryName.trim()}
+                      onClick={async () => {
+                        const name = newCategoryName.trim();
+                        if (!name) return;
+                        try {
+                          setCreatingCategory(true);
+                          const res = await apiFetch('/api/videos/categories', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ name }),
+                          });
+
+                          if (!res.ok) {
+                            throw new Error('Não foi possível criar a categoria');
+                          }
+
+                          const created: VideoCategory = await res.json();
+                          setCategories((prev) => {
+                            const exists = prev.some((c) => c.id === created.id);
+                            if (exists) return prev;
+                            return [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
+                          });
+                          setSelectedCategoryId(created.id);
+                          setNewCategoryName('');
+                          showSuccess('Categoria criada', `A categoria "${created.name}" foi criada com sucesso.`);
+                        } catch (error: any) {
+                          console.error('Erro ao criar categoria:', error);
+                          showError('Erro ao criar categoria', error?.message || 'Não foi possível criar a categoria.');
+                        } finally {
+                          setCreatingCategory(false);
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 hover:bg-green-600 disabled:bg-gray-700 text-sm font-semibold text-white transition-all duration-200"
+                    >
+                      {creatingCategory ? 'Criando categoria...' : 'Criar nova categoria'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
