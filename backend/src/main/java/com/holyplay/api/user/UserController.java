@@ -1,6 +1,7 @@
 package com.holyplay.api.user;
 
 import com.holyplay.api.user.dto.CreateUserRequest;
+import com.holyplay.api.user.dto.CreateAdminRequest;
 import com.holyplay.api.user.dto.UpdateUserRequest;
 import com.holyplay.api.user.dto.UserResponse;
 import com.holyplay.application.user.CreateUserUseCase;
@@ -11,6 +12,7 @@ import com.holyplay.domain.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,6 +46,22 @@ public class UserController {
                 request.getEmail(),
                 request.getPassword(),
                 request.getRole()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(user));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponse> createAdmin(@Valid @RequestBody CreateAdminRequest request) {
+        try {
+            User user = createUserUseCase.execute(
+                request.getName(),
+                request.getEmail(),
+                request.getPassword(),
+                "ADMIN"
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(user));
         } catch (IllegalArgumentException e) {

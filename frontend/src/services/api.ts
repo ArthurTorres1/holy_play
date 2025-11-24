@@ -12,6 +12,12 @@ export interface RegisterRequest {
   role: 'USER' | 'ADMIN';
 }
 
+export interface CreateAdminRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface User {
   id: number;
   name: string;
@@ -37,12 +43,20 @@ class ApiService {
     return await http.post('api/users', { body: userData });
   }
 
+  async createAdmin(userData: CreateAdminRequest): Promise<User> {
+    return await http.post('api/users/admin', { body: userData, auth: true });
+  }
+
   async getUsers(): Promise<User[]> {
     return await http.get('api/users', { auth: true });
   }
 
   async getUser(id: number): Promise<User> {
     return await http.get(`api/users/${id}`, { auth: true });
+  }
+
+  async getAdmins(): Promise<User[]> {
+    return await http.get('api/users?role=ADMIN', { auth: true });
   }
 }
 

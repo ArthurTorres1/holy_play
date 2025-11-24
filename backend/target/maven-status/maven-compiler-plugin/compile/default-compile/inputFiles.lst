@@ -44,6 +44,7 @@ C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\application\auth\AuthenticateUserUseCase.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\auth\dto\LoginRequest.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\home\dto\HomeConfigurationResponse.java
+C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\user\dto\CreateAdminRequest.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\home\dto\HomeConfigurationRequest.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\api\home\HomeConfiguration.java
 C:\Users\arthu\OneDrive\Documentos\holy_play\backend\src\main\java\com\holyplay\config\ServerConfig.java

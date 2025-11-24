@@ -9,6 +9,7 @@ import Alert from '../common/Alert';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { useAlert } from '../../hooks/useAlert';
 import { useConfirm } from '../../hooks/useConfirm';
+import { apiService, User as ApiUser } from '../../services/api';
 
 // Célula de Thumbnail: renderiza a thumbnail do vídeo com fallbacks
 type ThumbPrefs = {
@@ -136,9 +137,15 @@ const AdminPanel: React.FC = () => {
   const [selectedVideoForEdit, setSelectedVideoForEdit] = useState<Video | null>(null);
   const { alert, showSuccess, showError, hideAlert } = useAlert();
   const { confirm, showConfirm } = useConfirm();
+  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+  const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [admins, setAdmins] = useState<ApiUser[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
 
   useEffect(() => {
     loadVideos();
+    loadAdmins();
   }, []);
 
   const loadVideos = async () => {
@@ -151,6 +158,34 @@ const AdminPanel: React.FC = () => {
       showError('Erro ao carregar vídeos', 'Verifique suas credenciais da API.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAdmins = async () => {
+    try {
+      setLoadingAdmins(true);
+      const list = await apiService.getAdmins();
+      setAdmins(list);
+    } catch (error) {
+      // silencioso na UI principal; erros serão tratados quando tentar criar admin
+      console.error('Erro ao carregar admins:', error);
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
+  const handleCreateAdmin = async () => {
+    try {
+      setCreatingAdmin(true);
+      await apiService.createAdmin(adminForm);
+      showSuccess('Administrador criado', 'O novo administrador foi cadastrado com sucesso.');
+      setShowCreateAdmin(false);
+      setAdminForm({ name: '', email: '', password: '' });
+    } catch (error: any) {
+      const message = error?.payload?.message || error?.message || 'Erro ao criar administrador';
+      showError('Erro', message);
+    } finally {
+      setCreatingAdmin(false);
     }
   };
 
@@ -259,6 +294,15 @@ const AdminPanel: React.FC = () => {
                   <span>Adicionar Vídeo</span>
                 </button>
                 <button
+                  onClick={() => setShowCreateAdmin(true)}
+                  className="group bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-8 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-semibold border border-gray-600/50 hover:border-gray-500"
+                >
+                  <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20 transition-colors">
+                    <Plus size={20} />
+                  </div>
+                  <span>Adicionar Admin</span>
+                </button>
+                <button
                   onClick={loadVideos}
                   disabled={loading}
                   className="group bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-6 py-4 rounded-xl flex items-center gap-3 transition-all duration-200 font-medium border border-gray-600/50 hover:border-gray-500"
@@ -330,6 +374,37 @@ const AdminPanel: React.FC = () => {
                     {videos.reduce((sum, v) => sum + v.views, 0).toLocaleString()}
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Admins Section */}
+            <div className="mb-12">
+              <div className="bg-black/40 backdrop-blur-sm border border-gray-800 p-6 rounded-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-300">Administradores</h3>
+                  <button
+                    onClick={loadAdmins}
+                    disabled={loadingAdmins}
+                    className="text-sm px-3 py-1 rounded-md bg-gray-700/60 hover:bg-gray-700 text-gray-200 border border-gray-600/60 disabled:opacity-60"
+                  >
+                    {loadingAdmins ? 'Atualizando...' : 'Atualizar'}
+                  </button>
+                </div>
+                {admins.length === 0 ? (
+                  <div className="text-gray-500 text-sm">Nenhum administrador cadastrado.</div>
+                ) : (
+                  <ul className="divide-y divide-gray-800">
+                    {admins.map((adm) => (
+                      <li key={adm.id} className="py-2 flex items-center justify-between">
+                        <div>
+                          <div className="text-white font-medium">{adm.name}</div>
+                          <div className="text-gray-400 text-sm">{adm.email}</div>
+                        </div>
+                        <span className="text-xs text-gray-400">{new Date(adm.createdAt).toLocaleDateString('pt-BR')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
@@ -450,6 +525,64 @@ const AdminPanel: React.FC = () => {
             loadVideos();
           }}
         />
+      )}
+
+      {/* Create Admin Modal */}
+      {showCreateAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => !creatingAdmin && setShowCreateAdmin(false)} />
+          <div className="relative z-10 w-full max-w-md bg-gray-900 border border-gray-700 rounded-2xl p-6 shadow-xl">
+            <h3 className="text-xl font-semibold mb-4 text-white">Adicionar Administrador</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Nome</label>
+                <input
+                  type="text"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                  value={adminForm.name}
+                  onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
+                  disabled={creatingAdmin}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                  value={adminForm.email}
+                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  disabled={creatingAdmin}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Senha</label>
+                <input
+                  type="password"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                  disabled={creatingAdmin}
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800"
+                onClick={() => setShowCreateAdmin(false)}
+                disabled={creatingAdmin}
+              >
+                Cancelar
+              </button>
+              <button
+                className={`px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white ${creatingAdmin ? 'opacity-70 cursor-not-allowed' : ''}`}
+                onClick={handleCreateAdmin}
+                disabled={creatingAdmin}
+              >
+                {creatingAdmin ? 'Criando...' : 'Criar Admin'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showPlayer && selectedVideo && (
