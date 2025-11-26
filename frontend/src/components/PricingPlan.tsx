@@ -87,16 +87,16 @@ const PricingPlan = () => {
             {/* Botões de navegação */}
             <button
               onClick={prevPlan}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-red-600 hover:bg-red-700 text-white p-3 rounded-full transition-colors z-10"
+              className="absolute left-3 top-56 md:left-6 md:top-28 md:translate-y-0 bg-red-600 hover:bg-red-700 text-white p-2 md:p-3 rounded-full transition-colors z-10 shadow-lg"
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
             </button>
-            
+
             <button
               onClick={nextPlan}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-red-600 hover:bg-red-700 text-white p-3 rounded-full transition-colors z-10"
+              className="absolute right-3 top-56 md:right-6 md:top-28 md:translate-y-0 bg-red-600 hover:bg-red-700 text-white p-2 md:p-3 rounded-full transition-colors z-10 shadow-lg"
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
             </button>
 
             {/* Conteúdo do Plano */}
